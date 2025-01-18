@@ -1,3 +1,4 @@
+from osgeo import gdal
 import logging
 import sys
 from ecoshard import taskgraph
@@ -38,6 +39,29 @@ for dirpath in [OUTPUT_DIR, CLIPPED_DIR]:
     os.makedirs(dirpath, exist_ok=True)
 
 
+def vector_area_in_ha(vector_path):
+    dataset = gdal.OpenEx(vector_path, gdal.OF_VECTOR)
+    layer = dataset.GetLayer()
+
+    source_srs = layer.GetSpatialRef()
+    if not source_srs.IsProjected():
+        print("The vector's spatial reference is not projected. Please project it to a projected CRS.")
+        exit()
+
+    # Create an area variable
+    total_area_m2 = 0
+
+    # Loop through features to calculate the total area
+    for feature in layer:
+        geometry = feature.GetGeometryRef()
+        if geometry is not None:
+            total_area_m2 += geometry.GetArea()
+
+    # Convert area to hectares (1 hectare = 10,000 square meters)
+    total_area_ha = total_area_m2 / 10000
+
+    print(f"Total area of features: {total_area_ha:.2f} hectares")
+
 def create_subset(gdf, name, target_vector_path):
     LOGGER.info(f'creating subset of {name}')
     subset_gdf = gdf[gdf["Name"] == name]
@@ -67,6 +91,8 @@ def main():
     print(os.cpu_count())
     task_graph = taskgraph.TaskGraph(OUTPUT_DIR, os.cpu_count(), reporting_interval=10.0)
     for vector_id, vector_path in VECTOR_PATH_LOOKUP.items():
+        LOGGER.info(f'{vector_id} area: {vector_area_in_ha(vector_path)}')
+        return
         LOGGER.info(f'processing {vector_id}')
         for raster_basename, raster_path in BASE_RASTER_LOOKUP.items():
             LOGGER.info(f'clipping {raster_basename} to {vector_id}')
