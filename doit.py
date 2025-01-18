@@ -27,7 +27,10 @@ BASE_RASTER_LOOKUP = {
 }
 
 
-VECTOR_PATH = r"D:\repositories\roadmap2030\data\drive-download-20250117T210959Z-001\ES_combined.shp"
+VECTOR_PATH_LOOKUP = {
+    'non-arpa': r"D:\repositories\roadmap2030\data\Non-ARPA\non-ARPA.shp",
+    'arpa': r"D:\repositories\roadmap2030\data\arpa\ucs_ARPA.shp"
+}
 
 OUTPUT_DIR = './results'
 CLIPPED_DIR = os.path.join(OUTPUT_DIR, 'clipped')
@@ -36,49 +39,45 @@ for dirpath in [OUTPUT_DIR, CLIPPED_DIR]:
 
 
 def create_subset(gdf, name, target_vector_path):
+    LOGGER.info(f'creating subset of {name}')
     subset_gdf = gdf[gdf["Name"] == name]
     subset_gdf.to_file(target_vector_path, driver="GPKG")
+    LOGGER.info(f'done with subset of {name}')
 
 
 def clip_raster(base_raster_path, summary_vector_path, temp_clip_path):
-    target_pixel_size = geoprocessing.get_raster_info(base_raster_path)['pixel_size']
-    vector_bb = geoprocessing.get_vector_info(summary_vector_path)['bounding_box']
+    base_raster_info = geoprocessing.get_raster_info(base_raster_path)
+    summary_vector_info = geoprocessing.get_vector_info(summary_vector_path)
+    target_pixel_size = base_raster_info['pixel_size']
+    base_vector_bb = summary_vector_info['bounding_box']
+
+    target_bb = geoprocessing.transform_bounding_box(
+        base_vector_bb, summary_vector_info['projection_wkt'],
+        base_raster_info['projection_wkt'])
+
     geoprocessing.warp_raster(
         base_raster_path, target_pixel_size, temp_clip_path,
-        'near', target_bb=vector_bb, vector_mask_options={
+        'near', target_bb=target_bb, vector_mask_options={
             'mask_vector_path': summary_vector_path,
             'all_touched': True})
 
 
 def main():
     """Entry point."""
-    task_graph = taskgraph.TaskGraph(OUTPUT_DIR, os.cpu_count(), 15.0)
-    wkt_projection = geoprocessing.get_raster_info(next(iter(BASE_RASTER_LOOKUP.values())))['projection_wkt']
-    gdf = gpd.read_file(VECTOR_PATH)
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    unique_names = gdf["Name"].unique()
-    gdf = gdf.to_crs(wkt_projection)
-    for place_name in unique_names:
-        if not isinstance(place_name, str) or place_name.strip() == '':
-            continue
-        subset_vector_path = os.path.join(OUTPUT_DIR, f"{place_name}.gpkg")
-        subset_task = task_graph.add_task(
-            func=create_subset,
-            args=(gdf, place_name, subset_vector_path),
-            ignore_path_list=[subset_vector_path],
-            target_path_list=[subset_vector_path],
-            task_name=f'extract {place_name}')
-
+    print(os.cpu_count())
+    task_graph = taskgraph.TaskGraph(OUTPUT_DIR, os.cpu_count(), reporting_interval=10.0)
+    for vector_id, vector_path in VECTOR_PATH_LOOKUP.items():
+        LOGGER.info(f'processing {vector_id}')
         for raster_basename, raster_path in BASE_RASTER_LOOKUP.items():
+            LOGGER.info(f'clipping {raster_basename} to {vector_id}')
             clipped_raster_path = os.path.join(
-                CLIPPED_DIR, f'{place_name}_{raster_basename}.tif')
+                CLIPPED_DIR, f'{vector_id}_{raster_basename}.tif')
             clipped_task = task_graph.add_task(
                 func=clip_raster,
-                args=(raster_path, subset_vector_path, clipped_raster_path),
-                ignore_path_list=[subset_vector_path],
-                dependent_task_list=[subset_task],
+                args=(raster_path, vector_path, clipped_raster_path),
+                ignore_path_list=[vector_path],
                 target_path_list=[clipped_raster_path],
-                task_name=f'clipping {raster_path} to {subset_vector_path}')
+                task_name=f'clipping {raster_path} to {vector_path}')
 
     task_graph.join()
     print('all done!')
