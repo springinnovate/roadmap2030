@@ -1,7 +1,4 @@
 """Dynamic world landcover map puller.
-
-docker build . -t therealspring/roadmap2030_executor:latest && docker run --rm -it -v "C:\Users\richp\repositories\pestcontrol_livingdatabase\docker_contexts\backend\secrets\service-account-key.json":/usr/local/secrets/service-account-key.json -v C:\Users\richp\repositories\roadmap2030:/usr/local/esos_c_models therealspring/roadmap2030_executor:latest
-
 python3 dynamic_world_extractor.py --aoi_vector_path ./NGP_intersected_hybas_na_lev05_v1c.shp --date_ranges 2024-01-01--2024-01-31
 """
 import glob
@@ -73,18 +70,22 @@ def main():
         '--dataset_scale', type=float, default=DATASET_SCALE, help=(
             f'Override the base scale of {DATASET_SCALE}m to '
             f'whatever you desire.'))
-    parser.add_argument(
-        '--percentile', nargs='+', help='List of percentiles')
     args = parser.parse_args()
     authenticate()
 
-    vector_path_list = [path for path_list in glob.glob(args.aoi_vector_paths) for path in path_list]
+    existing_tasks = ee.batch.Task.list()
+    existing_descriptions = set()
+    for t in existing_tasks:
+        cfg = t.config
+        if cfg and 'description' in cfg:
+            existing_descriptions.add(cfg['description'])
+
+    vector_path_list = [path for path_pattern in args.aoi_vector_paths for path in glob.glob(path_pattern)]
 
     if args.status:
         # Loop through each task to print its status
         for task in ee.batch.Task.list():
-            print(task)
-            print("-----")
+            LOGGER.info(task)
         return
 
     # Generate date ranges for each year
@@ -109,7 +110,11 @@ def main():
             aoi_basename = os.path.basename(os.path.splitext(aoi_vector_path)[0])
             local_description = f'{DATASET_ID}_{aoi_basename}_{start_date}--{end_date}'
             local_description = local_description.replace('/', '_')
-            print(f'Description: "{local_description}"')
+
+            LOGGER.info(f'Description: "{local_description}"')
+            if local_description in existing_descriptions:
+                LOGGER.info(f"Task '{local_description}' already in queue. Skipping.")
+                continue
 
             task = ee.batch.Export.image.toDrive(
                 image=average_landcover_image,
@@ -121,17 +126,17 @@ def main():
                 fileFormat='GeoTIFF',
             )
             task.start()
-            task_list.append(f'{start_date}-{end_date}', task)
+            task_list.append((f'{start_date}-{end_date}', task))
 
     for date_str, task in task_list:
         while True:
             status = task.status()['state']
             if status in ['COMPLETED', 'FAILED', 'CANCELLED']:
                 break
-            print(f'{date_str}: {status}, waiting 10 more seconds')
+            LOGGER.info(f'{date_str}: {status}, waiting 10 more seconds')
             time.sleep(10)
 
-        print(f"Task finished with status: {task.status()['state']}")
+        LOGGER.info(f"Task finished with status: {task.status()['state']}")
 
 
 if __name__ == '__main__':
