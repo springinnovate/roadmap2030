@@ -2,14 +2,11 @@ import datetime
 import numpy
 import csv
 import collections
-import glob
 from osgeo import gdal
-from osgeo import ogr
 import logging
 import sys
 from ecoshard import taskgraph
 import os
-import geopandas as gpd
 from ecoshard import geoprocessing
 from ecoshard.geoprocessing import routing
 
@@ -33,7 +30,7 @@ ANALYSIS_TUPLES = {
     'non-arpa': (
         './data/non-arpa-projected-in-m.gpkg',
         './data/hydrosheds/hybas_sa_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_non-arpa-projected-in-m_intersected_hybas_sa_lev05_v1c.tif"',),
+        './data/dem_rasters/Clipped_ALOS_DEM_non-arpa-projected-in-m_intersected_hybas_sa_lev05_v1c.tif',),
     'Arctic_si': (
         './data/Arctic.gpkg',
         './data/hydrosheds/hybas_si_lev05_v1c.shp',
