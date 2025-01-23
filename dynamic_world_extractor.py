@@ -71,21 +71,24 @@ def main():
             f'Override the base scale of {DATASET_SCALE}m to '
             f'whatever you desire.'))
     parser.add_argument(
-        '--force', action='store_true', help="do this if need to recreate an image")
+        '--guard_tasks', action='store_true', help="do this if need to recreate an image")
 
     args = parser.parse_args()
+    LOGGER.info('about to authenticate')
     authenticate()
+    LOGGER.info('authenticate!')
 
-    existing_tasks = ee.batch.Task.list()
     existing_descriptions = set()
-    allowed_states = {"READY", "RUNNING", "COMPLETED"}
-    for t in existing_tasks:
-        cfg = t.config
-        if t.status()['state'] in allowed_states and cfg and 'description' in cfg:
-            existing_descriptions.add(cfg['description'])
+    if args.guard_tasks:
+        existing_tasks = ee.batch.Task.list()
+        allowed_states = {"READY", "RUNNING", "COMPLETED"}
+        for t in existing_tasks:
+            cfg = t.config
+            if t.status()['state'] in allowed_states and cfg and 'description' in cfg:
+                existing_descriptions.add(cfg['description'])
 
     vector_path_list = [path for path_pattern in args.aoi_vector_paths for path in glob.glob(path_pattern)]
-
+    LOGGER.info(f'processing {len(vector_path_list)} vectors')
     if args.status:
         # Loop through each task to print its status
         for task in ee.batch.Task.list():
@@ -98,10 +101,13 @@ def main():
     task_list = []
     for aoi_vector_path in vector_path_list:
         aoi_vector = gpd.read_file(aoi_vector_path).to_crs('EPSG:4326')
+        LOGGER.debug(aoi_vector.bounds)
+        return
         bounds = aoi_vector.bounds.iloc[0]
         bounding_box = [[bounds.minx, bounds.miny], [bounds.minx, bounds.maxy],
                         [bounds.maxx, bounds.maxy], [bounds.maxx, bounds.miny],
                         [bounds.minx, bounds.miny]]
+        LOGGER.debug(bounding_box)
 
         for date_range in date_ranges:
             start_date, end_date = date_range.split('--')
