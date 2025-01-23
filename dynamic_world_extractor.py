@@ -24,7 +24,7 @@ LOGGER.setLevel(logging.DEBUG)
 DATASET_ID = 'GOOGLE/DYNAMICWORLD/V1'
 DATASET_CRS = 'EPSG:4326'
 DATASET_SCALE = 10
-EXPORT_DRIVE_FOLDER = 'gee_export'
+EXPORT_DRIVE_FOLDER = 'gee_exports'
 
 
 def authenticate():
@@ -70,14 +70,18 @@ def main():
         '--dataset_scale', type=float, default=DATASET_SCALE, help=(
             f'Override the base scale of {DATASET_SCALE}m to '
             f'whatever you desire.'))
+    parser.add_argument(
+        '--force', action='store_true', help="do this if need to recreate an image")
+
     args = parser.parse_args()
     authenticate()
 
     existing_tasks = ee.batch.Task.list()
     existing_descriptions = set()
+    allowed_states = {"READY", "RUNNING", "COMPLETED"}
     for t in existing_tasks:
         cfg = t.config
-        if cfg and 'description' in cfg:
+        if t.status()['state'] in allowed_states and cfg and 'description' in cfg:
             existing_descriptions.add(cfg['description'])
 
     vector_path_list = [path for path_pattern in args.aoi_vector_paths for path in glob.glob(path_pattern)]
@@ -89,7 +93,8 @@ def main():
         return
 
     # Generate date ranges for each year
-    date_ranges = parse_monthly_ranges(args.years)
+    #parse_monthly_ranges(args.years)
+    date_ranges = [f'{year}-01-01--{year}-12-31' for year in args.years]
     task_list = []
     for aoi_vector_path in vector_path_list:
         aoi_vector = gpd.read_file(aoi_vector_path).to_crs('EPSG:4326')
@@ -112,7 +117,7 @@ def main():
             local_description = local_description.replace('/', '_')
 
             LOGGER.info(f'Description: "{local_description}"')
-            if local_description in existing_descriptions:
+            if not args.force and local_description in existing_descriptions:
                 LOGGER.info(f"Task '{local_description}' already in queue. Skipping.")
                 continue
 
@@ -123,6 +128,7 @@ def main():
                 scale=args.dataset_scale,
                 crs=DATASET_CRS,
                 region=bounding_box,
+                maxPixels=1e10,
                 fileFormat='GeoTIFF',
             )
             task.start()
@@ -141,3 +147,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+174332704
