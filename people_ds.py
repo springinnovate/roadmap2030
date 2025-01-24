@@ -29,40 +29,40 @@ POPULATION_RASTERS = [
 ANALYSIS_TUPLES = {
     'non-arpa': (
         './data/non-arpa-projected-in-m.gpkg',
-        './data/hydrosheds/hybas_sa_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_non-arpa-projected-in-m_intersected_hybas_sa_lev05_v1c.tif',),
+        './data/hybas_sa_lev05_intersect_non-arpa.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif'),
     'Arctic_si': (
         './data/Arctic.gpkg',
-        './data/hydrosheds/hybas_si_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_Arctic_intersected_hybas_si_lev05_v1c_compressed.tif'),
+        './data/hybas_si_lev05_intersect_Arctic_si.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_si_lev05_intersect_Arctic_sii.tif'),
     'Arctic_ar': (
         './data/Arctic.gpkg',
-        './data/hydrosheds/hybas_ar_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_Arctic_intersected_hybas_ar_lev05_v1c_compressed.tif'),
+        './data/hybas_ar_lev05_intersect_Arctic_ar.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif'),
     'arpa': (
         './data/arpa-projected-in-m.gpkg',
-        './data/hydrosheds/hybas_sa_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_arpa-projected-in-m_intersected_hybas_sa_lev05_v1c_compressed.tif'),
+        './data/hybas_sa_lev05_intersect_arpa.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_arpa.tif'),
     'Colombia': (
         './data/Colombia.gpkg',
-        './data/hydrosheds/hybas_sa_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_Colombia_intersected_hybas_sa_lev05_v1c_compressed.tif'),
+        './data/hybas_sa_lev05_intersect_Colombia.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Colombia.tif'),
     'NGP': (
         './data/NGP.gpkg',
-        './data/hydrosheds/hybas_na_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_NGP_intersected_hybas_na_lev05_v1c_compressed.tif'),
+        './data/hybas_na_lev05_intersect_NGP.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_NGP.tif'),
     'Peru': (
         './data/Peru.gpkg',
-        './data/hydrosheds/hybas_sa_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_Peru_intersected_hybas_sa_lev05_v1c_compressed.tif'),
+        './data/hybas_sa_lev05_intersect_Peru.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Peru.tif'),
     'RGRB': (
         './data/RGRB.gpkg',
-        './data/hydrosheds/hybas_na_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_RGRB_intersected_hybas_na_lev05_v1c_compressed.tif'),
+        './data/hybas_na_lev05_intersect_RGRB.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_RGRB.tif'),
     'Tapajos': (
         './data/Tapajos.gpkg',
-        './data/hydrosheds/hybas_sa_lev05_v1c.shp',
-        './data/dem_rasters/Clipped_ALOS_DEM_Tapajos_intersected_hybas_sa_lev05_v1c_compressed.tif'),
+        './data/hybas_sa_lev05_intersect_Tapajos.gpkg',
+        './data/dem_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Tapajos.tif'),
 
 }
 
