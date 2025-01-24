@@ -145,13 +145,12 @@ def main():
         ]
         dataset = (
             ee.ImageCollection(DATASET_ID)
-            .select(['DSM', 'MSK'])  # Select both DSM and MSK bands
+            .select('DSM')  # Select both DSM and MSK bands
             .filterBounds(ee.Geometry.Rectangle(list(total_bounds)))
-            .map(lambda image: image.updateMask(image.select('MSK').eq(0)))  # Mask invalid pixels where MSK != 0
         )
 
         # Combine images using median
-        dem_image = dataset.select('DSM').reduce(ee.Reducer.median())
+        dem_image = dataset.reduce(ee.Reducer.median())
 
         aoi_basename = os.path.basename(os.path.splitext(aoi_vector_path)[0])
         local_description = f'{DATASET_ID}_{aoi_basename}'
