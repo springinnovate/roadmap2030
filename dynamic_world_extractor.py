@@ -101,13 +101,13 @@ def main():
     task_list = []
     for aoi_vector_path in vector_path_list:
         aoi_vector = gpd.read_file(aoi_vector_path).to_crs('EPSG:4326')
-        LOGGER.debug(aoi_vector.bounds)
-        return
         bounds = aoi_vector.bounds.iloc[0]
         bounding_box = [[bounds.minx, bounds.miny], [bounds.minx, bounds.maxy],
                         [bounds.maxx, bounds.maxy], [bounds.maxx, bounds.miny],
                         [bounds.minx, bounds.miny]]
         LOGGER.debug(bounding_box)
+        LOGGER.debug(aoi_vector.bounds)
+        return
 
         for date_range in date_ranges:
             start_date, end_date = date_range.split('--')
