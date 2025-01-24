@@ -23,8 +23,8 @@ logging.getLogger('ecoshard.taskgraph').setLevel(logging.INFO)
 logging.getLogger('fiona').setLevel(logging.WARN)
 
 POPULATION_RASTERS = [
-    './data/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif',
-    './data/floodplains_masked_pop_30s_md5_c027686bb9a9a36bdababbe8af35d696.tif',]
+    './data/pop_rasters/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif',
+    './data/pop_rasters/floodplains_masked_pop_30s_md5_c027686bb9a9a36bdababbe8af35d696.tif',]
 
 ANALYSIS_TUPLES = {
     'non-arpa': (
@@ -34,7 +34,7 @@ ANALYSIS_TUPLES = {
     'Arctic_si': (
         './data/aois/Arctic.gpkg',
         './data/subwatersheds/hybas_si_lev05_intersect_Arctic_si.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_si_lev05_intersect_Arctic_sii.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_si_lev05_intersect_Arctic_si.tif_merged.tif'),
     'Arctic_ar': (
         './data/aois/Arctic.gpkg',
         './data/subwatersheds/hybas_ar_lev05_intersect_Arctic_ar.gpkg',
