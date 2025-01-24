@@ -101,20 +101,22 @@ def main():
     task_list = []
     for aoi_vector_path in vector_path_list:
         aoi_vector = gpd.read_file(aoi_vector_path).to_crs('EPSG:4326')
-        bounds = aoi_vector.bounds.iloc[0]
-        bounding_box = [[bounds.minx, bounds.miny], [bounds.minx, bounds.maxy],
-                        [bounds.maxx, bounds.maxy], [bounds.maxx, bounds.miny],
-                        [bounds.minx, bounds.miny]]
-        LOGGER.debug(bounding_box)
-        LOGGER.debug(aoi_vector.bounds)
-        return
+        aoi_vector = gpd.read_file(aoi_vector_path).to_crs('EPSG:4326')
+        total_bounds = aoi_vector.total_bounds  # [minx, miny, maxx, maxy]
+        bounding_box = [
+            [total_bounds[0], total_bounds[1]],
+            [total_bounds[0], total_bounds[3]],
+            [total_bounds[2], total_bounds[3]],
+            [total_bounds[2], total_bounds[1]],
+            [total_bounds[0], total_bounds[1]],
+        ]
 
         for date_range in date_ranges:
             start_date, end_date = date_range.split('--')
 
             dataset = (ee.ImageCollection(DATASET_ID)
                        .select('label')
-                       .filterBounds(ee.Geometry.Rectangle([bounds.minx, bounds.miny, bounds.maxx, bounds.maxy]))
+                       .filterBounds(ee.Geometry.Rectangle(list(total_bounds)))
                        .filterDate(start_date, end_date))
 
             average_landcover_image = dataset.reduce(ee.Reducer.mode())
@@ -127,15 +129,16 @@ def main():
                 LOGGER.info(f"Task '{local_description}' already in queue. Skipping.")
                 continue
 
-            task = ee.batch.Export.image.toDrive(
+            task = ee.batch.Export.image.toCloudStorage(
                 image=average_landcover_image,
                 description=local_description,
-                folder=EXPORT_DRIVE_FOLDER,
+                bucket='ecoshard-root',
+                fileNamePrefix=f'roadmap2030/{local_description}.tif',
+                region=bounding_box,
                 scale=args.dataset_scale,
                 crs=DATASET_CRS,
-                region=bounding_box,
-                maxPixels=1e10,
-                fileFormat='GeoTIFF',
+                maxPixels=1e13,
+                fileFormat='GeoTIFF'
             )
             task.start()
             task_list.append((f'{start_date}-{end_date}', task))
@@ -153,4 +156,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-174332704
