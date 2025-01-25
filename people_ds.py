@@ -162,6 +162,7 @@ def main():
             func=geoprocessing.reproject_vector,
             args=(
                 aoi_vector_path, target_projection_wkt, reprojected_aoi_vector_path),
+            ignore_path_list=[aoi_vector_path],
             target_path_list=[reprojected_aoi_vector_path],
             task_name=f'reproject {analysis_id}')
         flow_dir_path = os.path.join(local_workspace_dir, f'{analysis_id}_mfd_flow_dir.tif')
@@ -175,6 +176,7 @@ def main():
             func=rasterize,
             args=(reprojected_aoi_vector_path, dem_raster_path, aoi_raster_mask_path),
             dependent_task_list=[reproject_task],
+            ignore_path_list=[reprojected_aoi_vector_path],
             target_path_list=[aoi_raster_mask_path],
             task_name=f'{analysis_id} raster mask')
 
