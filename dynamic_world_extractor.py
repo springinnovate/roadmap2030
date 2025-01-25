@@ -71,7 +71,7 @@ def main():
             f'Override the base scale of {DATASET_SCALE}m to '
             f'whatever you desire.'))
     parser.add_argument(
-        '--guard_tasks', action='store_true', help="do this if need to recreate an image")
+        '--check_tasks', action='store_true', help="do this to protect duplicate tasks from running")
 
     args = parser.parse_args()
     LOGGER.info('about to authenticate')
@@ -79,7 +79,7 @@ def main():
     LOGGER.info('authenticate!')
 
     existing_descriptions = set()
-    if args.guard_tasks:
+    if args.check_tasks:
         existing_tasks = ee.batch.Task.list()
         allowed_states = {"READY", "RUNNING", "COMPLETED"}
         for t in existing_tasks:
@@ -125,7 +125,7 @@ def main():
             local_description = local_description.replace('/', '_')
 
             LOGGER.info(f'Description: "{local_description}"')
-            if not args.force and local_description in existing_descriptions:
+            if local_description in existing_descriptions:
                 LOGGER.info(f"Task '{local_description}' already in queue. Skipping.")
                 continue
 

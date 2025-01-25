@@ -99,7 +99,8 @@ def calc_flow_dir(analysis_id, base_dem_raster_path, aoi_vector_path, target_flo
     filled_dem_path = os.path.join(local_workspace_dir, f'{analysis_id}_dem_filled.tif')
     routing.fill_pits(
         (clipped_dem_path, 1), filled_dem_path,
-        working_dir=local_workspace_dir)
+        working_dir=local_workspace_dir,
+        max_pixel_fill_count=25000)
 
     routing.flow_dir_mfd(
         (filled_dem_path, 1), target_flow_dir_path,
