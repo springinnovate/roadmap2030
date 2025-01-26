@@ -30,46 +30,47 @@ ANALYSIS_TUPLES = {
     'non-arpa': (
         './data/aois/non-arpa-projected-in-m.gpkg',
         './data/subwatersheds/hybas_sa_lev05_intersect_non-arpa.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     'Arctic_si': (
         './data/aois/Arctic.gpkg',
         './data/subwatersheds/hybas_si_lev05_intersect_Arctic_si.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_si_lev05_intersect_Arctic_si.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_si_lev05_intersect_Arctic_si.tif_merged_compressed.tif'),
     'Arctic_ar': (
         './data/aois/Arctic.gpkg',
         './data/subwatersheds/hybas_ar_lev05_intersect_Arctic_ar.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif'),
     'arpa': (
         './data/aois/arpa-projected-in-m.gpkg',
         './data/subwatersheds/hybas_sa_lev05_intersect_arpa.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_arpa.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_arpa.tif_merged_compressed.tif'),
     'Colombia': (
         './data/aois/Colombia.gpkg',
         './data/subwatersheds/hybas_sa_lev05_intersect_Colombia.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Colombia.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Colombia.tif_merged_compressed.tif'),
     'NGP': (
         './data/aois/NGP.gpkg',
         './data/subwatersheds/hybas_na_lev05_intersect_NGP.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_NGP.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_NGP.tif_merged_compressed.tif'),
     'Peru': (
         './data/aois/Peru.gpkg',
         './data/subwatersheds/hybas_sa_lev05_intersect_Peru.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Peru.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Peru.tif_merged_compressed.tif'),
     'RGRB': (
         './data/aois/RGRB.gpkg',
         './data/subwatersheds/hybas_na_lev05_intersect_RGRB.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_RGRB.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_RGRB.tif_merged_compressed.tif'),
     'Tapajos': (
         './data/aois/Tapajos.gpkg',
         './data/subwatersheds/hybas_sa_lev05_intersect_Tapajos.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Tapajos.tif_merged.tif'),
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Tapajos.tif_merged_compressed.tif'),
 
 }
 
-OUTPUT_DIR = './results'
+OUTPUT_DIR = './people_ds_results_900'
 CLIPPED_DIR = os.path.join(OUTPUT_DIR, 'clipped')
 for dirpath in [OUTPUT_DIR, CLIPPED_DIR]:
     os.makedirs(dirpath, exist_ok=True)
+POP_PIXEL_SIZE = [0.008333333333333, -0.008333333333333]
 
 
 def calc_flow_dir(analysis_id, base_dem_raster_path, aoi_vector_path, target_flow_dir_path):
@@ -84,7 +85,7 @@ def calc_flow_dir(analysis_id, base_dem_raster_path, aoi_vector_path, target_flo
     bounding_box = geoprocessing.merge_bounding_box_list(
         [dem_info['bounding_box'], aoi_bb], 'intersection')
     geoprocessing.warp_raster(
-        base_dem_raster_path, dem_info['pixel_size'], clipped_dem_path,
+        base_dem_raster_path, POP_PIXEL_SIZE, clipped_dem_path,
         'nearest', target_bb=bounding_box, vector_mask_options={
             'mask_vector_path': aoi_vector_path,
             'all_touched': True,
@@ -162,7 +163,7 @@ def main():
             func=geoprocessing.reproject_vector,
             args=(
                 aoi_vector_path, target_projection_wkt, reprojected_aoi_vector_path),
-            ignore_path_list=[aoi_vector_path],
+            ignore_path_list=[aoi_vector_path, reprojected_aoi_vector_path],
             target_path_list=[reprojected_aoi_vector_path],
             task_name=f'reproject {analysis_id}')
         flow_dir_path = os.path.join(local_workspace_dir, f'{analysis_id}_mfd_flow_dir.tif')
