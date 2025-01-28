@@ -184,7 +184,8 @@ def main():
 
             dataset = (
                 ee.ImageCollection(DATASET_ID)
-                .select('precipitation')  # Select both DSM and MSK bands
+                .select('precipitation')
+                .filterDate(start_date, end_date)
                 .filterBounds(ee.Geometry.Rectangle(list(total_bounds)))
             )
 

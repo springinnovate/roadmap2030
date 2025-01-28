@@ -27,43 +27,55 @@ POPULATION_RASTERS = [
     './data/pop_rasters/floodplains_masked_pop_30s_md5_c027686bb9a9a36bdababbe8af35d696.tif',]
 
 ANALYSIS_TUPLES = {
-    'non-arpa': (
-        './data/aois/non-arpa-projected-in-m.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_intersect_non-arpa.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    'Arctic_si': (
-        './data/aois/Arctic.gpkg',
-        './data/subwatersheds/hybas_si_lev05_intersect_Arctic_si.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_si_lev05_intersect_Arctic_si.tif_merged_compressed.tif'),
-    'Arctic_ar': (
-        './data/aois/Arctic.gpkg',
-        './data/subwatersheds/hybas_ar_lev05_intersect_Arctic_ar.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif'),
-    'arpa': (
-        './data/aois/arpa-projected-in-m.gpkg',
+    'arpa_split': (
+        './data/aois/Arpa_nonoverlapping-in-m.gpkg',
         './data/subwatersheds/hybas_sa_lev05_intersect_arpa.gpkg',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_arpa.tif_merged_compressed.tif'),
-    'Colombia': (
-        './data/aois/Colombia.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_intersect_Colombia.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Colombia.tif_merged_compressed.tif'),
-    'NGP': (
-        './data/aois/NGP.gpkg',
-        './data/subwatersheds/hybas_na_lev05_intersect_NGP.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_NGP.tif_merged_compressed.tif'),
-    'Peru': (
-        './data/aois/Peru.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_intersect_Peru.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Peru.tif_merged_compressed.tif'),
-    'RGRB': (
-        './data/aois/RGRB.gpkg',
-        './data/subwatersheds/hybas_na_lev05_intersect_RGRB.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_RGRB.tif_merged_compressed.tif'),
-    'Tapajos': (
-        './data/aois/Tapajos.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_intersect_Tapajos.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Tapajos.tif_merged_compressed.tif'),
+    'non-arpa_split': (
+        './data/aois/non-Arpa_nonoverlapping-in-m.gpkg',
+        './data/subwatersheds/hybas_sa_lev05_intersect_non-arpa.gpkg',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    'union-arpa-non': (
+        './data/aois/union_arpa_non-arpa.gpkg',
+        './data/subwatersheds/hybas_sa_lev05_intersect_arpa_non-arpa.gpkg',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
 
+    # 'non-arpa': (
+    #     './data/aois/non-arpa-projected-in-m.gpkg',
+    #     './data/subwatersheds/hybas_sa_lev05_intersect_non-arpa.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # 'Arctic_si': (
+    #     './data/aois/Arctic.gpkg',
+    #     './data/subwatersheds/hybas_si_lev05_intersect_Arctic_si.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_si_lev05_intersect_Arctic_si.tif_merged_compressed.tif'),
+    # 'Arctic_ar': (
+    #     './data/aois/Arctic.gpkg',
+    #     './data/subwatersheds/hybas_ar_lev05_intersect_Arctic_ar.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif'),
+    # 'arpa': (
+    #     './data/aois/arpa-projected-in-m.gpkg',
+    #     './data/subwatersheds/hybas_sa_lev05_intersect_arpa.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_arpa.tif_merged_compressed.tif'),
+    # 'Colombia': (
+    #     './data/aois/Colombia.gpkg',
+    #     './data/subwatersheds/hybas_sa_lev05_intersect_Colombia.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Colombia.tif_merged_compressed.tif'),
+    # 'NGP': (
+    #     './data/aois/NGP.gpkg',
+    #     './data/subwatersheds/hybas_na_lev05_intersect_NGP.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_NGP.tif_merged_compressed.tif'),
+    # 'Peru': (
+    #     './data/aois/Peru.gpkg',
+    #     './data/subwatersheds/hybas_sa_lev05_intersect_Peru.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Peru.tif_merged_compressed.tif'),
+    # 'RGRB': (
+    #     './data/aois/RGRB.gpkg',
+    #     './data/subwatersheds/hybas_na_lev05_intersect_RGRB.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_na_lev05_intersect_RGRB.tif_merged_compressed.tif'),
+    # 'Tapajos': (
+    #     './data/aois/Tapajos.gpkg',
+    #     './data/subwatersheds/hybas_sa_lev05_intersect_Tapajos.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Tapajos.tif_merged_compressed.tif'),
 }
 
 OUTPUT_DIR = './people_ds_results_900'
@@ -121,7 +133,7 @@ def mask_by_nonzero_and_sum(analysis_id, base_raster_path, mask_raster_path, tar
     nodata = base_raster_info['nodata'][0]
     def _mask_by_nonzero(base_array, mask_array):
         result = base_array.copy()
-        result[mask_array == 0] = nodata
+        result[mask_array != 0] = nodata
         return result
 
     working_dir_path = os.path.dirname(target_masked_path)
