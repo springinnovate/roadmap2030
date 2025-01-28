@@ -178,7 +178,7 @@ def mask_by_nonzero_and_sum(analysis_id, base_raster_path, mask_raster_path, tar
     nodata = base_raster_info['nodata'][0]
     def _mask_by_nonzero(base_array, mask_array):
         result = base_array.copy()
-        result[mask_array != 0] = nodata
+        result[mask_array < 0] = nodata
         return result
 
     working_dir_path = os.path.dirname(target_masked_path)
