@@ -190,7 +190,7 @@ def main():
             )
 
             # Combine images using median
-            precip_image = dataset.reduce(ee.Reducer.median())
+            precip_image = dataset.sum()
 
             aoi_basename = os.path.basename(os.path.splitext(aoi_vector_path)[0])
             precip_description = f'{DATASET_SHORT_ID}_precipitation_{aoi_basename}_{start_date}--{end_date}'

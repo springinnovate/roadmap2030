@@ -52,7 +52,6 @@ RUN git clone https://github.com/springinnovate/ecoshard.git /usr/local/ecoshard
     micromamba run -n hf39 pip install . && \
     git log -1 --format="%h on %ci" > /usr/local/ecoshard.gitversion
 
-
 RUN git clone https://github.com/springinnovate/inspring.git /usr/local/inspring && \
     cd /usr/local/inspring && \
     micromamba run -n hf39 pip install . && \
