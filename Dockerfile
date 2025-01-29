@@ -45,7 +45,8 @@ RUN apt-get update -y && apt-get install google-cloud-cli -y
 ENV GEE_KEY_PATH=/usr/local/secrets/service-account-key.json
 ENV GOOGLE_APPLICATION_CREDENTIALS=/usr/local/secrets/service-account-key.json
 
-ARG CACHEBUST=1
+ARG CACHEBUST
+RUN echo $(date +%s) > /tmp/cachebuster
 
 RUN git clone https://github.com/springinnovate/ecoshard.git /usr/local/ecoshard && \
     cd /usr/local/ecoshard && \
@@ -68,4 +69,4 @@ RUN echo 'if [ -f "/usr/local/ecoshard.gitversion" ]; then' >> /home/mambauser/.
 USER mambauser
 WORKDIR ${WORKDIR}
 #CMD ["/bin/bash"]
-CMD ["micromamba", "run", "-n", "hf39", "python", "-m", "ecoshard.geosharding.geosharding", "swy_amazon.ini"]
+CMD ["micromamba", "run", "-n", "hf39", "python", "-m", "ecoshard.geosharding.geosharding", "swy_amazon_1992.ini", "--debug_n_aoi", "1"]

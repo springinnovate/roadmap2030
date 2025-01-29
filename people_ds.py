@@ -9,6 +9,7 @@ from ecoshard import taskgraph
 import os
 from ecoshard import geoprocessing
 from ecoshard.geoprocessing import routing
+import numpy
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -26,6 +27,12 @@ POPULATION_RASTERS = [
     './data/pop_rasters/landscan-global-2023.tif',]
     #'./data/pop_rasters/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif',
     #'./data/pop_rasters/floodplains_masked_pop_30s_md5_c027686bb9a9a36bdababbe8af35d696.tif',]
+
+POP_PIXEL_SIZE = [0.008333333333333, -0.008333333333333]
+km_in_deg = POP_PIXEL_SIZE[0] * 1000 / 900  # because it's 900m so converting to 1km
+BUFFER_AMOUNTS_IN_PIXELS_M = [
+    (int(numpy.round(x * km_in_deg / POP_PIXEL_SIZE[0])), x*1000)
+    for x in range(0, 6)]  # try buffer zones of 0-5km
 
 ANALYSIS_TUPLES = {
     '37_GEF_Peru': (
@@ -131,7 +138,7 @@ ANALYSIS_TUPLES = {
 OUTPUT_DIR = './people_ds_results_900_v2'
 for dirpath in [OUTPUT_DIR,]:
     os.makedirs(dirpath, exist_ok=True)
-POP_PIXEL_SIZE = [0.008333333333333, -0.008333333333333]
+
 
 
 def calc_flow_dir(analysis_id, base_dem_raster_path, aoi_vector_path, target_flow_dir_path):
@@ -208,11 +215,28 @@ def mask_by_nonzero_and_sum(analysis_id, base_raster_path, mask_raster_path, tar
     return numpy.sum(array)
 
 
+def create_circular_kernel(kernel_path, buffer_size_in_px):
+    diameter = buffer_size_in_px * 2 + 1
+    kernel_array = numpy.zeros((diameter, diameter), dtype=numpy.float32)
+    cx, cy = buffer_size_in_px, buffer_size_in_px
+
+    for i in range(diameter):
+        for j in range(diameter):
+            if (i - cx)**2 + (j - cy)**2 <= buffer_size_in_px**2:
+                kernel_array[i, j] = 1.0
+
+    driver = gdal.GetDriverByName("GTiff")
+    out_raster = driver.Create(kernel_path, diameter, diameter, 1, gdal.GDT_Float32)
+    out_raster.GetRasterBand(1).WriteArray(kernel_array)
+    out_raster.FlushCache()
+    out_raster = None
+
+
 def main():
     """Entry point."""
     task_graph = taskgraph.TaskGraph(OUTPUT_DIR, os.cpu_count(), reporting_interval=10.0)
-
-    result = collections.defaultdict(lambda: collections.defaultdict())
+    kernel_task_map = {}
+    result = collections.defaultdict(lambda: collections.defaultdict(lambda: collections.defaultdict(dict)))
     file = open('log.txt', 'w')
     clipped_dem_work_list = []
     for analysis_id, (aoi_vector_path, subwatershed_vector_path, dem_raster_path) in ANALYSIS_TUPLES.items():
@@ -258,37 +282,70 @@ def main():
             dependent_task_list=[flow_dir_task, rasterize_task],
             target_path_list=[aoi_downstream_flow_mask_path],
             task_name=f'flow accum for {analysis_id}')
-        for population_raster_path in POPULATION_RASTERS:
-            pop_basename = os.path.splitext(os.path.basename(population_raster_path))[0]
-            print(f'processing {pop_basename}')
 
-            masked_population_raster_path = os.path.join(
-                local_workspace_dir, f'{analysis_id}_{os.path.basename(population_raster_path)}')
-            mask_by_nonzero_task = task_graph.add_task(
-                func=mask_by_nonzero_and_sum,
-                args=(
-                    f'{analysis_id}_{pop_basename}', population_raster_path, aoi_downstream_flow_mask_path, masked_population_raster_path),
-                dependent_task_list=[flow_accum_task],
-                target_path_list=[masked_population_raster_path],
-                store_result=True,
-                task_name=f'{analysis_id}_population mask')
-            file.write(
-                f'{analysis_id}_{pop_basename}, {population_raster_path}, {aoi_downstream_flow_mask_path}, {masked_population_raster_path}\n')
+        for buffer_size_in_px, buffer_size_in_m in BUFFER_AMOUNTS_IN_PIXELS_M:
+            if buffer_size_in_px > 0:
+                buffered_downstream_flow_mask_path = f'%s_{buffer_size_in_m}m%s' % os.path.splitext(aoi_downstream_flow_mask_path)
+                # make a kernel raster that is a circle kernel that's all 1s within buffer_size_in_px from the center
+                # dimensions should be buffer_size_in_px*2+1 X buffer_size_in_px*2+1
+                # no projection is necessary
+                kernel_path = os.path.join(local_workspace_dir, f'kernel_{buffer_size_in_m}.tif')
+                convolve_dependent_task_list = [flow_accum_task]
+                if kernel_path not in kernel_task_map:
+                    kernel_task = task_graph.add_task(
+                        func=create_circular_kernel,
+                        args=(kernel_path, buffer_size_in_px),
+                        target_path_list=[kernel_path],
+                        task_name=f'kernel for {kernel_path}')
+                    kernel_task_map[kernel_path] = kernel_task
+                    convolve_dependent_task_list.append(kernel_task)
+                else:
+                    convolve_dependent_task_list.append(kernel_task_map[kernel_path])
+                buffer_task = task_graph.add_task(
+                    func=geoprocessing.convolve_2d,
+                    args=(
+                        (aoi_downstream_flow_mask_path, 1), (kernel_path, 1), buffered_downstream_flow_mask_path),
+                    kwargs={'n_workers': 1},
+                    target_path_list=[buffered_downstream_flow_mask_path],
+                    dependent_task_list=convolve_dependent_task_list,
+                    task_name=f'buffer {buffered_downstream_flow_mask_path}')
+                mask_by_nonzero_and_sum_dependent_task_list = [buffer_task]
+            else:
+                buffered_downstream_flow_mask_path = aoi_downstream_flow_mask_path
+                mask_by_nonzero_and_sum_dependent_task_list = [flow_accum_task]
 
-            result[analysis_id][pop_basename] = mask_by_nonzero_task
+            for population_raster_path in POPULATION_RASTERS:
+                pop_basename = os.path.splitext(os.path.basename(population_raster_path))[0]
+                print(f'processing {pop_basename} for {buffer_size_in_m}m buffer')
+                masked_population_raster_path = os.path.join(
+                    local_workspace_dir, f'{analysis_id}_{os.path.basename(population_raster_path)}')
+                mask_by_nonzero_task = task_graph.add_task(
+                    func=mask_by_nonzero_and_sum,
+                    args=(
+                        f'{analysis_id}_{pop_basename}', population_raster_path, buffered_downstream_flow_mask_path, masked_population_raster_path),
+                    dependent_task_list=mask_by_nonzero_and_sum_dependent_task_list,
+                    target_path_list=[masked_population_raster_path],
+                    store_result=True,
+                    task_name=f'{analysis_id}_population mask')
+                file.write(
+                    f'{analysis_id}_{pop_basename}, {population_raster_path}, {buffered_downstream_flow_mask_path}, {masked_population_raster_path}\n')
+
+                result[analysis_id][pop_basename][buffer_size_in_m] = mask_by_nonzero_task
 
     for analysis_id in result:
         for pop_basename in result[analysis_id]:
-            result[analysis_id][pop_basename] = result[analysis_id][pop_basename].get()
+            for buffer_size_in_m in result[analysis_id][pop_basename]:
+                result[analysis_id][pop_basename][buffer_size_in_m] = result[analysis_id][pop_basename][buffer_size_in_m].get()
 
     timestamp = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     output_filename = os.path.join(OUTPUT_DIR, f'pop_results_{timestamp}.csv')
     with open(output_filename, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['analysis_id', 'pop_basename', 'value'])
+        writer.writerow(['analysis_id', 'pop_basename', 'buffer in m', 'value'])
         for analysis_id in result:
-            for pop_basename, val in result[analysis_id].items():
-                writer.writerow([analysis_id, pop_basename, val])
+            for pop_basename, buffer_val_dict in result[analysis_id].items():
+                for buffer, val in buffer_val_dict.items():
+                    writer.writerow([analysis_id, pop_basename, val])
     task_graph.join()
     task_graph.close()
     LOGGER.info(f'all done results at {output_filename}')
