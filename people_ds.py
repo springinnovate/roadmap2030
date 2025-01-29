@@ -23,68 +23,73 @@ logging.getLogger('ecoshard.taskgraph').setLevel(logging.INFO)
 logging.getLogger('fiona').setLevel(logging.WARN)
 
 POPULATION_RASTERS = [
-    './data/pop_rasters/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif',
-    './data/pop_rasters/floodplains_masked_pop_30s_md5_c027686bb9a9a36bdababbe8af35d696.tif',]
+    './data/pop_rasters/landscan-global-2023.tif',]
+    #'./data/pop_rasters/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif',
+    #'./data/pop_rasters/floodplains_masked_pop_30s_md5_c027686bb9a9a36bdababbe8af35d696.tif',]
 
 ANALYSIS_TUPLES = {
     '37_GEF_Peru': (
-        './data/37_GEF_Peru.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+       './data/37_GEF_Peru.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '49_GEF_Guyana_KPMA_NRW': (
-        './data/49_GEF_Guyana_KPMA_NRW.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+       './data/49_GEF_Guyana_KPMA_NRW.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '105_Arpa_nonoverlapping_clipped': (
-        './data/105_Arpa_nonoverlapping_clipped.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+       './data/105_Arpa_nonoverlapping_clipped.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '106_HECO': (
-        './data/106_HECO.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+       './data/106_HECO.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '110_PatriomonioPeru': (
-        './data/110_PatriomonioPeru.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+       './data/110_PatriomonioPeru.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '118_NBSOP2': (
-        './data/118_NBSOP2.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+       './data/118_NBSOP2.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '118_NBSOP3': (
-        './data/118_NBSOP3.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+       './data/118_NBSOP3.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '118_NBSOP4': (
         './data/118_NBSOP4.gpkg',
         './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '120_Tapajos': (
-        './data/120_Tapajos.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+       './data/120_Tapajos.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     '133_Sall': (
-        './data/133_Sall.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    'Amazon_aoi': (
+       './data/133_Sall.gpkg',
+       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+     'Amazon_aoi': (
         './data/Amazon_aoi.gpkg',
         './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    #'arpa_split': (
+     'WWF_Amazon_sites': (
+        './data/000_All_WWF_Amazon_sites.gpkg',
+        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # 'arpa_split': (
     #    './data/aois/Arpa_nonoverlapping-in-m.gpkg',
     #    './data/subwatersheds/hybas_sa_lev05_intersect_arpa.gpkg',
     #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_arpa.tif_merged_compressed.tif'),
-    #'non-arpa_split': (
+    # 'non-arpa_split': (
     #    './data/aois/non-Arpa_nonoverlapping-in-m.gpkg',
     #    './data/subwatersheds/hybas_sa_lev05_intersect_non-arpa.gpkg',
     #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    #'union-arpa-non': (
+    # 'union-arpa-non': (
     #    './data/aois/union_arpa_non-arpa.gpkg',
     #    './data/subwatersheds/hybas_sa_lev05_intersect_arpa_non-arpa.gpkg',
     #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     # 'non-arpa': (
-    #     './data/aois/non-arpa-projected-in-m.gpkg',
+    #     './data/aois/non-Arpa_nonoverlapping-in-m.gpkg',
     #     './data/subwatersheds/hybas_sa_lev05_intersect_non-arpa.gpkg',
     #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     # 'Arctic_si': (
@@ -96,9 +101,11 @@ ANALYSIS_TUPLES = {
     #     './data/subwatersheds/hybas_ar_lev05_intersect_Arctic_ar.gpkg',
     #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif'),
     # 'arpa': (
-    #     './data/aois/arpa-projected-in-m.gpkg',
+    #     './data/aois/Arpa_nonoverlapping-in-m.gpkg',
     #     './data/subwatersheds/hybas_sa_lev05_intersect_arpa.gpkg',
     #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_arpa.tif_merged_compressed.tif'),
+    #     ERROR 1: database disk image is malformed
+    # gdalinfo failed - unable to open './data/aois/Colombia.gpkg'.
     # 'Colombia': (
     #     './data/aois/Colombia.gpkg',
     #     './data/subwatersheds/hybas_sa_lev05_intersect_Colombia.gpkg',
@@ -121,9 +128,8 @@ ANALYSIS_TUPLES = {
     #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Tapajos.tif_merged_compressed.tif'),
 }
 
-OUTPUT_DIR = './people_ds_results_900'
-CLIPPED_DIR = os.path.join(OUTPUT_DIR, 'clipped')
-for dirpath in [OUTPUT_DIR, CLIPPED_DIR]:
+OUTPUT_DIR = './people_ds_results_900_v2'
+for dirpath in [OUTPUT_DIR,]:
     os.makedirs(dirpath, exist_ok=True)
 POP_PIXEL_SIZE = [0.008333333333333, -0.008333333333333]
 
@@ -178,12 +184,12 @@ def mask_by_nonzero_and_sum(analysis_id, base_raster_path, mask_raster_path, tar
     nodata = base_raster_info['nodata'][0]
     def _mask_by_nonzero(base_array, mask_array):
         result = base_array.copy()
-        result[mask_array < 0] = nodata
+        result[mask_array <= 0] = nodata
         return result
 
     working_dir_path = os.path.dirname(target_masked_path)
     aligned_raster_path_list = [
-        os.path.join(working_dir_path, f'%s_{analysis_id}_aligned%s' % os.path.splitext(os.path.basename(path)))
+        os.path.join(working_dir_path, analysis_id, f'%s_{analysis_id}_aligned%s' % os.path.splitext(os.path.basename(path)))
         for path in [base_raster_path, mask_raster_path]]
     geoprocessing.align_and_resize_raster_stack(
         [base_raster_path, mask_raster_path],
@@ -205,10 +211,10 @@ def mask_by_nonzero_and_sum(analysis_id, base_raster_path, mask_raster_path, tar
 def main():
     """Entry point."""
     task_graph = taskgraph.TaskGraph(OUTPUT_DIR, os.cpu_count(), reporting_interval=10.0)
-    task_graph.join()
 
     result = collections.defaultdict(lambda: collections.defaultdict())
-
+    file = open('log.txt', 'w')
+    clipped_dem_work_list = []
     for analysis_id, (aoi_vector_path, subwatershed_vector_path, dem_raster_path) in ANALYSIS_TUPLES.items():
         local_workspace_dir = os.path.join(OUTPUT_DIR, analysis_id)
         os.makedirs(local_workspace_dir, exist_ok=True)
@@ -230,8 +236,10 @@ def main():
             target_path_list=[flow_dir_path],
             store_result=True,
             task_name=f'calculate flow dir for {analysis_id}')
+        clipped_dem_work_list.append((analysis_id, (local_workspace_dir, flow_dir_path, reprojected_aoi_vector_path, subwatershed_vector_path, aoi_raster_mask_path, flow_dir_task)))
+    for analysis_id, (local_workspace_dir, flow_dir_path, reprojected_aoi_vector_path, subwatershed_vector_path, aoi_raster_mask_path, flow_dir_task) in clipped_dem_work_list:
         clipped_dem_path = flow_dir_task.get()
-
+        print(analysis_id)
         rasterize_task = task_graph.add_task(
             func=rasterize,
             args=(reprojected_aoi_vector_path, clipped_dem_path, aoi_raster_mask_path),
@@ -255,7 +263,7 @@ def main():
             print(f'processing {pop_basename}')
 
             masked_population_raster_path = os.path.join(
-                OUTPUT_DIR, f'{analysis_id}_{os.path.basename(population_raster_path)}')
+                local_workspace_dir, f'{analysis_id}_{os.path.basename(population_raster_path)}')
             mask_by_nonzero_task = task_graph.add_task(
                 func=mask_by_nonzero_and_sum,
                 args=(
@@ -264,6 +272,8 @@ def main():
                 target_path_list=[masked_population_raster_path],
                 store_result=True,
                 task_name=f'{analysis_id}_population mask')
+            file.write(
+                f'{analysis_id}_{pop_basename}, {population_raster_path}, {aoi_downstream_flow_mask_path}, {masked_population_raster_path}\n')
 
             result[analysis_id][pop_basename] = mask_by_nonzero_task
 
@@ -272,7 +282,7 @@ def main():
             result[analysis_id][pop_basename] = result[analysis_id][pop_basename].get()
 
     timestamp = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    output_filename = f'pop_results_{timestamp}.csv'
+    output_filename = os.path.join(OUTPUT_DIR, f'pop_results_{timestamp}.csv')
     with open(output_filename, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['analysis_id', 'pop_basename', 'value'])
@@ -282,7 +292,7 @@ def main():
     task_graph.join()
     task_graph.close()
     LOGGER.info(f'all done results at {output_filename}')
-
+    file.close()
 
 if __name__ == '__main__':
     main()
