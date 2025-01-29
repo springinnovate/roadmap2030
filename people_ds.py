@@ -112,7 +112,6 @@ ANALYSIS_TUPLES = {
     #     './data/subwatersheds/hybas_sa_lev05_intersect_arpa.gpkg',
     #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_arpa.tif_merged_compressed.tif'),
     #     ERROR 1: database disk image is malformed
-    # gdalinfo failed - unable to open './data/aois/Colombia.gpkg'.
     # 'Colombia': (
     #     './data/aois/Colombia.gpkg',
     #     './data/subwatersheds/hybas_sa_lev05_intersect_Colombia.gpkg',
@@ -318,11 +317,11 @@ def main():
                 pop_basename = os.path.splitext(os.path.basename(population_raster_path))[0]
                 print(f'processing {pop_basename} for {buffer_size_in_m}m buffer')
                 masked_population_raster_path = os.path.join(
-                    local_workspace_dir, f'{analysis_id}_{os.path.basename(population_raster_path)}')
+                    local_workspace_dir, f'{analysis_id}_{buffer_size_in_m}m_{os.path.basename(population_raster_path)}')
                 mask_by_nonzero_task = task_graph.add_task(
                     func=mask_by_nonzero_and_sum,
                     args=(
-                        f'{analysis_id}_{pop_basename}', population_raster_path, buffered_downstream_flow_mask_path, masked_population_raster_path),
+                        f'{analysis_id}_{pop_basename}_{buffer_size_in_m}', population_raster_path, buffered_downstream_flow_mask_path, masked_population_raster_path),
                     dependent_task_list=mask_by_nonzero_and_sum_dependent_task_list,
                     target_path_list=[masked_population_raster_path],
                     store_result=True,
@@ -345,7 +344,7 @@ def main():
         for analysis_id in result:
             for pop_basename, buffer_val_dict in result[analysis_id].items():
                 for buffer, val in buffer_val_dict.items():
-                    writer.writerow([analysis_id, pop_basename, val])
+                    writer.writerow([analysis_id, pop_basename, buffer, val])
     task_graph.join()
     task_graph.close()
     LOGGER.info(f'all done results at {output_filename}')
