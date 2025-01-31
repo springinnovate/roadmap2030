@@ -460,7 +460,8 @@ def dump_results_to_csv(results, vector_path_lookup, csv_path):
                     r_max,
                     r_mean,
                     r_sum
-                ] + [stats_dict.get(f'p{percentile}') for percentile in PERCENTILES_LIST])
+                ] + [stats_dict.get(f'p{percentile}', '') for percentile in PERCENTILES_LIST] +
+                [stats_dict.get(f'area_ge_{thr}', '') for thr in THRESHOLD_AREA_LIST])
 
 
 def main():
