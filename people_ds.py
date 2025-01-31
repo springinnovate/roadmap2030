@@ -35,54 +35,127 @@ BUFFER_AMOUNTS_IN_PIXELS_M = [
     for x in range(0, 6)]  # try buffer zones of 0-5km
 
 ANALYSIS_TUPLES = {
-    '37_GEF_Peru': (
-       './data/37_GEF_Peru.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '49_GEF_Guyana_KPMA_NRW': (
-       './data/49_GEF_Guyana_KPMA_NRW.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '105_Arpa_nonoverlapping_clipped': (
-       './data/105_Arpa_nonoverlapping_clipped.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '106_HECO': (
-       './data/106_HECO.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '110_PatriomonioPeru': (
-       './data/110_PatriomonioPeru.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '118_NBSOP2': (
-       './data/118_NBSOP2.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '118_NBSOP3': (
-       './data/118_NBSOP3.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '118_NBSOP4': (
-        './data/118_NBSOP4.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '120_Tapajos': (
-       './data/120_Tapajos.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-    '133_Sall': (
-       './data/133_Sall.gpkg',
-       './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-       './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-     'Amazon_aoi': (
-        './data/Amazon_aoi.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
-     'WWF_Amazon_sites': (
-        './data/000_All_WWF_Amazon_sites.gpkg',
-        './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+     '105': (
+        './data/aois/final_pilot/105.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_105.tif.tif'
+        ),
+     '106': (
+        './data/aois/final_pilot/106.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_106.tif.tif'
+        ),
+     '107': (
+        './data/aois/final_pilot/107.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_107.tif.tif'
+        ),
+     '110': (
+        './data/aois/final_pilot/110.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_110.tif.tif'
+        ),
+     '118_combined': (
+        './data/aois/final_pilot/118_combined.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_118_combined.tif.tif'
+        ),
+     '120': (
+        './data/aois/final_pilot/120.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_120.tif.tif'
+        ),
+     '133': (
+        './data/aois/final_pilot/133.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_133.tif.tif'
+        ),
+     '158-199': (
+        './data/aois/final_pilot/158-199.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_158-199.tif.tif'
+        ),
+     '196': (
+        './data/aois/final_pilot/196.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_196.tif.tif'
+        ),
+     '23': (
+        './data/aois/final_pilot/23.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_23.tif.tif'
+        ),
+     '300-302': (
+        './data/aois/final_pilot/300-302.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_300-302.tif.tif'
+        ),
+     '313': (
+        './data/aois/final_pilot/313.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_313.tif.tif'
+        ),
+     '37': (
+        './data/aois/final_pilot/37.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_37.tif.tif'
+        ),
+     '49': (
+        './data/aois/final_pilot/49.gpkg',
+        'placeholder for subwatersheds',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_49.tif.tif'
+        ),
+
+
+
+    # '37_GEF_Peru': (
+    #    './data/37_GEF_Peru.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '49_GEF_Guyana_KPMA_NRW': (
+    #    './data/49_GEF_Guyana_KPMA_NRW.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '105_Arpa_nonoverlapping_clipped': (
+    #    './data/105_Arpa_nonoverlapping_clipped.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '106_HECO': (
+    #    './data/106_HECO.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '110_PatriomonioPeru': (
+    #    './data/110_PatriomonioPeru.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '118_NBSOP2': (
+    #    './data/118_NBSOP2.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '118_NBSOP3': (
+    #    './data/118_NBSOP3.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '118_NBSOP4': (
+    #     './data/118_NBSOP4.gpkg',
+    #     './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '120_Tapajos': (
+    #    './data/120_Tapajos.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # '133_Sall': (
+    #    './data/133_Sall.gpkg',
+    #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # 'Amazon_aoi': (
+    #     './data/Amazon_aoi.gpkg',
+    #     './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
+    # 'WWF_Amazon_sites': (
+    #     './data/000_All_WWF_Amazon_sites.gpkg',
+    #     './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
+    #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_non-arpa.tif_merged_compressed.tif'),
     # 'arpa_split': (
     #    './data/aois/Arpa_nonoverlapping-in-m.gpkg',
     #    './data/subwatersheds/hybas_sa_lev05_intersect_arpa.gpkg',

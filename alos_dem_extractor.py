@@ -53,43 +53,6 @@ def authenticate():
     ee.Initialize()
 
 
-def make_shared_folder():
-    from googleapiclient.discovery import build
-    from google.oauth2.service_account import Credentials
-
-    # Path to your service account key file
-    gee_key_path = os.environ['GEE_KEY_PATH']
-    SCOPES = ['https://www.googleapis.com/auth/drive']
-
-    # Authenticate the service account
-    credentials = Credentials.from_service_account_file(gee_key_path, scopes=SCOPES)
-    drive_service = build('drive', 'v3', credentials=credentials)
-
-    # Create a folder in the service account's Drive
-    folder_metadata = {
-        'name': EXPORT_DRIVE_FOLDER,
-        'mimeType': 'application/vnd.google-apps.folder'
-    }
-    folder = drive_service.files().create(body=folder_metadata, fields='id').execute()
-    folder_id = folder.get('id')
-
-    print(f"Folder created with ID: {folder_id}")
-
-    # Share the folder with your personal Google account
-    user_permission = {
-        'type': 'user',
-        'role': 'writer',
-        'emailAddress': 'richpsharp@gmail.com'
-    }
-    drive_service.permissions().create(
-        fileId=folder_id,
-        body=user_permission,
-        fields='id'
-    ).execute()
-
-    print("Folder shared successfully!")
-
-
 def main():
     parser = argparse.ArgumentParser(description=(
         'Extract ALOS DSM.'))
@@ -108,10 +71,6 @@ def main():
     args = parser.parse_args()
     authenticate()
 
-    if args.create_shared_folder:
-        make_shared_folder()
-        return
-
     existing_descriptions = set()
     if args.check_tasks:
         existing_tasks = ee.batch.Task.list()
@@ -121,8 +80,9 @@ def main():
             if t.status()['state'] in allowed_states and cfg and 'description' in cfg:
                 existing_descriptions.add(cfg['description'])
 
+    LOGGER.info(f'reading the vectors at {args.aoi_vector_paths}')
     vector_path_list = [path for path_pattern in args.aoi_vector_paths for path in glob.glob(path_pattern)]
-
+    LOGGER.info(f'processing {len(vector_path_list)} vectors')
     if args.status:
         credentials, project = google.auth.default()
         print(f"Authenticated account: {credentials.service_account_email if hasattr(credentials, 'service_account_email') else 'Unknown account'}")
@@ -133,7 +93,7 @@ def main():
 
     task_list = []
     for aoi_vector_path in vector_path_list:
-        aoi_vector = gpd.read_file(aoi_vector_path).to_crs('EPSG:4326')
+        LOGGER.info(f'reading file {aoi_vector_path}')
         aoi_vector = gpd.read_file(aoi_vector_path).to_crs('EPSG:4326')
         total_bounds = aoi_vector.total_bounds  # [minx, miny, maxx, maxy]
         bounding_box = [
@@ -143,6 +103,7 @@ def main():
             [total_bounds[2], total_bounds[1]],
             [total_bounds[0], total_bounds[1]],
         ]
+        LOGGER.info(f'bounds are {bounding_box}')
         dataset = (
             ee.ImageCollection(DATASET_ID)
             .select('DSM')  # Select both DSM and MSK bands
