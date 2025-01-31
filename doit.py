@@ -27,11 +27,14 @@ DEM_PATH = r"D:/repositories/downstream-beneficiaries/workspace/global_dem_3s_md
 
 PERCENTILES_LIST = [10, 25, 75, 90]
 
+# report the area in the clipped raster that has values >= to these values
+THRESHOLD_AREA_LIST = [0.9, 0.75, 0.5]
+
 BASE_RASTER_LOOKUP = {
     #'lspop2019': r"D:\repositories\roadmap2030\data/pop_rasters/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif",
     #'floodpop': r"D:\repositories\roadmap2030\data/pop_rasters/floodplains_masked_pop_30s_md5_c027686bb9a9a36bdababbe8af35d696.tif",
     #'lspop2023': r"D:\repositories\roadmap2030\data\pop_rasters\landscan-global-2023.tif",
-    #'eii': r"D:\repositories\data_platform\Nature\eii_padj_v5140524_epsg_3395.tif",
+    'eii': r"D:\repositories\data_platform\Nature\eii_padj_v5140524_epsg_3395.tif",
     #'sed_export_change': r"D:\repositories\roadmap2030\data\ndv_0.0_sed_export_marineESA_2020-1992_change_md5_0ab0cf.tif",
     ##'cv_habitat_change': r"D:\repositories\roadmap2030\data\ndv_0.0_cv_habitat_value_marESA2020-1992_change_md5_1643a7.tif",
     #'n_export_change': r"D:\repositories\roadmap2030\data\ndv_0.0_n_export_marineESA_2020-1992_change_val_md5_18a2b3.tif",
@@ -270,31 +273,32 @@ BASE_RASTER_LOOKUP = {
     #'1992_QF_12': r"D:\repositories\roadmap2030\global_swy_runs\amazon_swy_1992_results\QF_12.tif",
     #'1992_B_sum': r"D:\repositories\roadmap2030\global_swy_runs\amazon_swy_1992_results\B_sum.tif",
     #'ARPA_AGB_from_Karuna_CO2e': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\ARPA_AGB_from_Karuna_CO2e_compressed.tif",
-    'carbon_2008': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2008_compressed_std_forest_edge_result.tif",
+    #'carbon_2008': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2008_compressed_std_forest_edge_result.tif",
 }
 
 
 VECTOR_PATH_LOOKUP = {
-    #'37_GEF_Peru': r"D:\repositories\roadmap2030\data\37_GEF_Peru.gpkg",
-    #'49_GEF_Guyana_KPMA_NRW': r"D:\repositories\roadmap2030\data\49_GEF_Guyana_KPMA_NRW.gpkg",
-    #'105_Arpa_nonoverlapping_clipped': r"D:\repositories\roadmap2030\data\105_Arpa_nonoverlapping_clipped.gpkg",
-    #'106_HECO': r"D:\repositories\roadmap2030\data\106_HECO.gpkg",
-    #'110_PatriomonioPeru': r"D:\repositories\roadmap2030\data\110_PatriomonioPeru.gpkg",
-    #'118_NBSOP2': r"D:\repositories\roadmap2030\data\118_NBSOP2.gpkg",
-    #'118_NBSOP3': r"D:\repositories\roadmap2030\data\118_NBSOP3.gpkg",
-    #'118_NBSOP4': r"D:\repositories\roadmap2030\data\118_NBSOP4.gpkg",
-    #'120_Tapajos': r"D:\repositories\roadmap2030\data\120_Tapajos.gpkg",
-    #'133_Sall': r"D:\repositories\roadmap2030\data\133_Sall.gpkg",
-    #'All_WWF_Amazon': r"D:\repositories\roadmap2030\data\000_All_WWF_Amazon_sites.gpkg",
-    #'Amazon': r"D:\repositories\roadmap2030\data\Amazon_aoi.gpkg",
+    '37_GEF_Peru': r"D:\repositories\roadmap2030\data\37_GEF_Peru.gpkg",
+    '49_GEF_Guyana_KPMA_NRW': r"D:\repositories\roadmap2030\data\49_GEF_Guyana_KPMA_NRW.gpkg",
+    '105_Arpa_nonoverlapping_clipped': r"D:\repositories\roadmap2030\data\105_Arpa_nonoverlapping_clipped.gpkg",
+    '106_HECO': r"D:\repositories\roadmap2030\data\106_HECO.gpkg",
+    '110_PatriomonioPeru': r"D:\repositories\roadmap2030\data\110_PatriomonioPeru.gpkg",
+    '118_NBSOP2': r"D:\repositories\roadmap2030\data\118_NBSOP2.gpkg",
+    '118_NBSOP3': r"D:\repositories\roadmap2030\data\118_NBSOP3.gpkg",
+    '118_NBSOP4': r"D:\repositories\roadmap2030\data\118_NBSOP4.gpkg",
+    '120_Tapajos': r"D:\repositories\roadmap2030\data\120_Tapajos.gpkg",
+    '133_Sall': r"D:\repositories\roadmap2030\data\133_Sall.gpkg",
+    'All_WWF_Amazon': r"D:\repositories\roadmap2030\data\000_All_WWF_Amazon_sites.gpkg",
+    'Amazon': r"D:\repositories\roadmap2030\data\Amazon_aoi.gpkg",
     'non-arpa': r"D:\repositories\roadmap2030\data\non-Arpa_nonoverlapping-in-m.gpkg",
-    #'arpa': r"D:\repositories\roadmap2030\data\Arpa_nonoverlapping-in-m.gpkg",
-    #'colombia': r"D:\repositories\roadmap2030\data\Colombia.gpkg",
-    #'peru': r"D:\repositories\roadmap2030\data\Peru.gpkg",
-    #'tapajos': r"D:\repositories\roadmap2030\data\Tapajos.gpkg",
-    #'NGP': r"D:\repositories\roadmap2030\data\NGP.gpkg",
-    #'RGBR': r"D:\repositories\roadmap2030\data\RGRB.gpkg",
-    #'Arctic': r"D:\repositories\roadmap2030\data\Arctic.gpkg"
+    'arpa': r"D:\repositories\roadmap2030\data\Arpa_nonoverlapping-in-m.gpkg",
+    'colombia': r"D:\repositories\roadmap2030\data\Colombia.gpkg",
+    'peru': r"D:\repositories\roadmap2030\data\Peru.gpkg",
+    'tapajos': r"D:\repositories\roadmap2030\data\Tapajos.gpkg",
+    'NGP': r"D:\repositories\roadmap2030\data\NGP.gpkg",
+    'RGBR': r"D:\repositories\roadmap2030\data\RGRB.gpkg",
+    'Arctic': r"D:\repositories\roadmap2030\data\Arctic.gpkg",
+    '105': r"D:\repositories\roadmap2030\data\aois\final_pilot\105.gpkg",
 }
 
 OUTPUT_DIR = './results'
@@ -324,6 +328,7 @@ def vector_area_in_ha(vector_path):
     total_area_ha = total_area_m2 / 10000
     return total_area_ha
 
+
 def create_subset(gdf, name, target_vector_path):
     LOGGER.info(f'creating subset of {name}')
     subset_gdf = gdf[gdf["Name"] == name]
@@ -347,6 +352,45 @@ def clip_raster(base_raster_path, summary_vector_path, temp_clip_path):
             'mask_vector_path': summary_vector_path,
             'all_touched': True})
 
+
+def get_area_stats(raster_path, thresholds):
+    r = gdal.Open(raster_path)
+    proj_wkt = r.GetProjection()
+    srs = osr.SpatialReference()
+    srs.ImportFromWkt(proj_wkt)
+    if srs.IsGeographic():
+        warp_srs = osr.SpatialReference()
+        warp_srs.ImportFromEPSG(54009)  # Mollweide (World)
+        warped_ds = gdal.Warp(
+            '', r, format='MEM',
+            dstSRS=warp_srs,
+            resampleAlg=gdal.GRA_NearestNeighbour
+        )
+    else:
+        warped_ds = r
+
+    band = warped_ds.GetRasterBand(1)
+    arr = band.ReadAsArray().astype(float)
+    nodata = band.GetNoDataValue()
+
+    valid_mask = numpy.ones_like(arr, dtype=bool)
+    if nodata is not None:
+        valid_mask &= (arr != nodata)
+    valid_mask &= ~numpy.isnan(arr)
+    arr = arr[valid_mask]
+
+    gt = warped_ds.GetGeoTransform()
+    pixel_area_m2 = abs(gt[1] * gt[5])
+    results = {}
+
+    for thr in thresholds:
+        pix_count = numpy.count_nonzero(arr >= thr)
+        area_ha = (pix_count * pixel_area_m2) / 10000.0  # 1 ha = 10,000 m^2
+        results[f'area_ge_{thr}'] = area_ha
+
+    return results
+
+
 def get_stats(raster_path):
     r = gdal.OpenEx(raster_path)
     b = r.GetRasterBand(1)
@@ -365,16 +409,25 @@ def get_stats(raster_path):
         f'p{percentile}': value
         for percentile, value in zip(
             PERCENTILES_LIST,
-            np.percentile(array, PERCENTILES_LIST))
+            numpy.percentile(array, PERCENTILES_LIST))
     }
     stats.update(percentile_dict)
 
+    value_thresholds = get_area_stats(raster_path, THRESHOLD_AREA_LIST)
+
+    stats.update(value_thresholds)
+
+
     return stats
+
 
 def dump_results_to_csv(results, vector_path_lookup, csv_path):
     with open(csv_path, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["vector_id", "raster_name", "area_ha", "min", "max", "mean", "sum"])
+        writer.writerow(
+            ["vector_id", "raster_name", "area_ha", "min", "max", "mean", "sum"] +
+            [f'p{percentile}' for percentile in PERCENTILES_LIST] +
+            [f'area_ge_{threshold}' for threshold in THRESHOLD_AREA_LIST])
         for vector_id, info_dict in results.items():
             area_ha = info_dict.get("area_ha", None)
             if area_ha is not None:
@@ -407,7 +460,7 @@ def dump_results_to_csv(results, vector_path_lookup, csv_path):
                     r_max,
                     r_mean,
                     r_sum
-                ])
+                ] + [stats_dict.get(f'p{percentile}') for percentile in PERCENTILES_LIST])
 
 
 def main():
