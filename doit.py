@@ -388,6 +388,9 @@ def get_area_stats(raster_path, thresholds):
         area_ha = (pix_count * pixel_area_m2) / 10000.0  # 1 ha = 10,000 m^2
         results[f'area_ge_{thr}'] = area_ha
 
+    area_ha = (arr.size * pixel_area_m2) / 10000.0  # 1 ha = 10,000 m^2
+    results['area_ha'] = area_ha
+
     return results
 
 
@@ -451,11 +454,11 @@ def dump_results_to_csv(results, vector_path_lookup, csv_path):
                 r_max = stats_dict.get("max", "")
                 r_mean = stats_dict.get("mean", "")
                 r_sum = stats_dict.get("sum", "")
-
+                area_ha = stats_dict.get('area_ha', '')
                 writer.writerow([
                     vector_id,
                     raster_basename,  # raster_name
-                    "",               # area_ha is empty here
+                    area_ha,               # area_ha is empty here
                     r_min,
                     r_max,
                     r_mean,
