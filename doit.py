@@ -360,6 +360,15 @@ def get_stats(raster_path):
         'sum': numpy.sum(array),
         'mean': numpy.mean(array)
     }
+
+    percentile_dict = {
+        f'p{percentile}': value
+        for percentile, value in zip(
+            PERCENTILES_LIST,
+            np.percentile(array, PERCENTILES_LIST))
+    }
+    stats.update(percentile_dict)
+
     return stats
 
 def dump_results_to_csv(results, vector_path_lookup, csv_path):
