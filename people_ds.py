@@ -1,3 +1,8 @@
+import geopandas as gpd
+from shapely.ops import transform
+from shapely.geometry import box
+import fiona
+import pyproj
 import datetime
 import numpy
 import csv
@@ -34,75 +39,63 @@ BUFFER_AMOUNTS_IN_PIXELS_M = [
     (int(numpy.round(x * km_in_deg / POP_PIXEL_SIZE[0])), x*1000)
     for x in range(0, 6)]  # try buffer zones of 0-5km
 
+GLOBAL_SUBWATERSHEDS_VECTOR_PATH = './data/hydrosheds/global_lev05.gpkg'
+
 ANALYSIS_TUPLES = {
      '105': (
         './data/aois/final_pilot/105.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_105.tif.tif'
         ),
      '106': (
         './data/aois/final_pilot/106.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_106.tif.tif'
         ),
      '107': (
         './data/aois/final_pilot/107.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_107.tif.tif'
         ),
      '110': (
         './data/aois/final_pilot/110.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_110.tif.tif'
         ),
      '118_combined': (
         './data/aois/final_pilot/118_combined.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_118_combined.tif.tif'
         ),
      '120': (
         './data/aois/final_pilot/120.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_120.tif.tif'
         ),
      '133': (
         './data/aois/final_pilot/133.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_133.tif.tif'
         ),
      '158-199': (
         './data/aois/final_pilot/158-199.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_158-199.tif.tif'
         ),
      '196': (
         './data/aois/final_pilot/196.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_196.tif.tif'
         ),
      '23': (
         './data/aois/final_pilot/23.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_23.tif.tif'
         ),
      '300-302': (
         './data/aois/final_pilot/300-302.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_300-302.tif.tif'
         ),
      '313': (
         './data/aois/final_pilot/313.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_313.tif.tif'
         ),
      '37': (
         './data/aois/final_pilot/37.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_37.tif.tif'
         ),
      '49': (
         './data/aois/final_pilot/49.gpkg',
-        'placeholder for subwatersheds',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_49.tif.tif'
         ),
 
@@ -304,6 +297,27 @@ def create_circular_kernel(kernel_path, buffer_size_in_px):
     out_raster = None
 
 
+def subset_subwatersheds(aoi_vector_path, subwatershed_vector_path, subset_subwatersheds_vector_path):
+    aoi = gpd.read_file(aoi_vector_path)
+    aoi_crs = aoi.crs
+    minx, miny, maxx, maxy = aoi.total_bounds
+    with fiona.open(subwatershed_vector_path, "r") as src:
+        subwatershed_crs = src.crs
+    aoi_bbox_geom = box(minx, miny, maxx, maxy)
+    if aoi_crs != subwatershed_crs:
+        transformer = pyproj.Transformer.from_crs(aoi_crs, subwatershed_crs, always_xy=True).transform
+        aoi_bbox_geom = transform(transformer, aoi_bbox_geom)
+    minx_sub, miny_sub, maxx_sub, maxy_sub = aoi_bbox_geom.bounds
+    subwatershed_filtered = gpd.read_file(
+        subwatershed_vector_path,
+        bbox=(minx_sub, miny_sub, maxx_sub, maxy_sub)
+    )
+    if subwatershed_crs != aoi_crs:
+        subwatershed_filtered = subwatershed_filtered.to_crs(aoi_crs)
+    clipped = gpd.clip(subwatershed_filtered, aoi)
+    clipped.to_file(subset_subwatersheds_vector_path, driver="GPKG")
+
+
 def main():
     """Entry point."""
     task_graph = taskgraph.TaskGraph(OUTPUT_DIR, os.cpu_count(), reporting_interval=10.0)
@@ -311,9 +325,16 @@ def main():
     result = collections.defaultdict(lambda: collections.defaultdict(lambda: collections.defaultdict(dict)))
     file = open('log.txt', 'w')
     clipped_dem_work_list = []
-    for analysis_id, (aoi_vector_path, subwatershed_vector_path, dem_raster_path) in ANALYSIS_TUPLES.items():
+    for analysis_id, (aoi_vector_path, dem_raster_path) in ANALYSIS_TUPLES.items():
         local_workspace_dir = os.path.join(OUTPUT_DIR, analysis_id)
         os.makedirs(local_workspace_dir, exist_ok=True)
+        subset_subwatersheds_vector_path = os.path.join(local_workspace_dir, f'subwatershed_{analysis_id}.gpkg')
+        subset_task = task_graph.add_task(
+            func=subset_subwatersheds,
+            args=(aoi_vector_path, GLOBAL_SUBWATERSHEDS_VECTOR_PATH, subset_subwatersheds_vector_path),
+            target_path_list=[subset_subwatersheds_vector_path],
+            task_name=f'subset subwatersheds for {analysis_id}')
+
         aoi_raster_mask_path = os.path.join(
             local_workspace_dir, f'{analysis_id}_aoi_mask.tif')
         target_projection_wkt = geoprocessing.get_raster_info(dem_raster_path)['projection_wkt']
@@ -328,12 +349,13 @@ def main():
         flow_dir_path = os.path.join(local_workspace_dir, f'{analysis_id}_mfd_flow_dir.tif')
         flow_dir_task = task_graph.add_task(
             func=calc_flow_dir,
-            args=(analysis_id, dem_raster_path, subwatershed_vector_path, flow_dir_path),
+            args=(analysis_id, dem_raster_path, subset_subwatersheds_vector_path, flow_dir_path),
+            dependent_task_list=[subset_task],
             target_path_list=[flow_dir_path],
             store_result=True,
             task_name=f'calculate flow dir for {analysis_id}')
-        clipped_dem_work_list.append((analysis_id, (local_workspace_dir, flow_dir_path, reprojected_aoi_vector_path, subwatershed_vector_path, aoi_raster_mask_path, flow_dir_task)))
-    for analysis_id, (local_workspace_dir, flow_dir_path, reprojected_aoi_vector_path, subwatershed_vector_path, aoi_raster_mask_path, flow_dir_task) in clipped_dem_work_list:
+        clipped_dem_work_list.append((analysis_id, (local_workspace_dir, flow_dir_path, reprojected_aoi_vector_path, aoi_raster_mask_path, flow_dir_task)))
+    for analysis_id, (local_workspace_dir, flow_dir_path, reprojected_aoi_vector_path, aoi_raster_mask_path, flow_dir_task) in clipped_dem_work_list:
         clipped_dem_path = flow_dir_task.get()
         print(analysis_id)
         rasterize_task = task_graph.add_task(

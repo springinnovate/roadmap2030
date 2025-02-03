@@ -25,7 +25,7 @@ LOGGER.setLevel(logging.DEBUG)
 DATASET_ID = 'JAXA/ALOS/AW3D30/V3_2'
 DATASET_CRS = 'EPSG:4326'
 DATASET_SCALE = 30
-EXPORT_DRIVE_FOLDER = 'gee_exports'
+EXPORT_DRIVE_FOLDER = 'gee_exports/ALOS'
 
 
 def authenticate():
