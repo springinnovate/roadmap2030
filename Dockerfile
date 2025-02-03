@@ -68,5 +68,5 @@ RUN echo 'if [ -f "/usr/local/ecoshard.gitversion" ]; then' >> /home/mambauser/.
 
 USER mambauser
 WORKDIR ${WORKDIR}
-#CMD ["/bin/bash"]
-CMD ["micromamba", "run", "-n", "hf39", "python", "-m", "ecoshard.geosharding.geosharding", "swy_amazon_1992.ini", "--debug_n_aoi", "1"]
+CMD ["/bin/bash"]
+#CMD ["micromamba", "run", "-n", "hf39", "python", "-m", "ecoshard.geosharding.geosharding", "swy_amazon_1992.ini", "--debug_n_aoi", "1"]
