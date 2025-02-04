@@ -82,10 +82,10 @@ ANALYSIS_TUPLES = {
         './data/aois/final_pilot/23.gpkg',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_23.tif.tif'
         ),
-     '300-302': (
-        './data/aois/final_pilot/300-302.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_300-302.tif.tif'
-        ),
+     # '300-302': (
+     #    './data/aois/final_pilot/300-302.gpkg',
+     #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_300-302.tif.tif'
+     #    ),
      '313': (
         './data/aois/final_pilot/313.gpkg',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_313.tif.tif'
@@ -98,9 +98,6 @@ ANALYSIS_TUPLES = {
         './data/aois/final_pilot/49.gpkg',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_49.tif.tif'
         ),
-
-
-
     # '37_GEF_Peru': (
     #    './data/37_GEF_Peru.gpkg',
     #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
@@ -200,10 +197,10 @@ ANALYSIS_TUPLES = {
     #     './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_sa_lev05_intersect_Tapajos.tif_merged_compressed.tif'),
 }
 
+
 OUTPUT_DIR = './people_ds_results_900_v2'
 for dirpath in [OUTPUT_DIR,]:
     os.makedirs(dirpath, exist_ok=True)
-
 
 
 def calc_flow_dir(analysis_id, base_dem_raster_path, aoi_vector_path, target_flow_dir_path):
@@ -299,23 +296,33 @@ def create_circular_kernel(kernel_path, buffer_size_in_px):
 
 def subset_subwatersheds(aoi_vector_path, subwatershed_vector_path, subset_subwatersheds_vector_path):
     aoi = gpd.read_file(aoi_vector_path)
+    aoi = aoi.set_geometry(aoi.geometry.buffer(0))
     aoi_crs = aoi.crs
+    aoi_union = aoi.geometry.unary_union
     minx, miny, maxx, maxy = aoi.total_bounds
+
     with fiona.open(subwatershed_vector_path, "r") as src:
         subwatershed_crs = src.crs
+
     aoi_bbox_geom = box(minx, miny, maxx, maxy)
+
     if aoi_crs != subwatershed_crs:
         transformer = pyproj.Transformer.from_crs(aoi_crs, subwatershed_crs, always_xy=True).transform
         aoi_bbox_geom = transform(transformer, aoi_bbox_geom)
+
     minx_sub, miny_sub, maxx_sub, maxy_sub = aoi_bbox_geom.bounds
+
     subwatershed_filtered = gpd.read_file(
         subwatershed_vector_path,
         bbox=(minx_sub, miny_sub, maxx_sub, maxy_sub)
     )
+    subwatershed_filtered = subwatershed_filtered.set_geometry(subwatershed_filtered.geometry.buffer(0))
+
     if subwatershed_crs != aoi_crs:
         subwatershed_filtered = subwatershed_filtered.to_crs(aoi_crs)
-    clipped = gpd.clip(subwatershed_filtered, aoi)
-    clipped.to_file(subset_subwatersheds_vector_path, driver="GPKG")
+
+    intersected = subwatershed_filtered[subwatershed_filtered.intersects(aoi_union)]
+    intersected.to_file(subset_subwatersheds_vector_path, driver="GPKG")
 
 
 def main():
@@ -328,12 +335,6 @@ def main():
     for analysis_id, (aoi_vector_path, dem_raster_path) in ANALYSIS_TUPLES.items():
         local_workspace_dir = os.path.join(OUTPUT_DIR, analysis_id)
         os.makedirs(local_workspace_dir, exist_ok=True)
-        subset_subwatersheds_vector_path = os.path.join(local_workspace_dir, f'subwatershed_{analysis_id}.gpkg')
-        subset_task = task_graph.add_task(
-            func=subset_subwatersheds,
-            args=(aoi_vector_path, GLOBAL_SUBWATERSHEDS_VECTOR_PATH, subset_subwatersheds_vector_path),
-            target_path_list=[subset_subwatersheds_vector_path],
-            task_name=f'subset subwatersheds for {analysis_id}')
 
         aoi_raster_mask_path = os.path.join(
             local_workspace_dir, f'{analysis_id}_aoi_mask.tif')
@@ -346,6 +347,15 @@ def main():
             ignore_path_list=[aoi_vector_path, reprojected_aoi_vector_path],
             target_path_list=[reprojected_aoi_vector_path],
             task_name=f'reproject {analysis_id}')
+
+        subset_subwatersheds_vector_path = os.path.join(local_workspace_dir, f'subwatershed_{analysis_id}.gpkg')
+        subset_task = task_graph.add_task(
+            func=subset_subwatersheds,
+            args=(reprojected_aoi_vector_path, GLOBAL_SUBWATERSHEDS_VECTOR_PATH, subset_subwatersheds_vector_path),
+            dependent_task_list=[reproject_task],
+            target_path_list=[subset_subwatersheds_vector_path],
+            task_name=f'subset subwatersheds for {analysis_id}')
+
         flow_dir_path = os.path.join(local_workspace_dir, f'{analysis_id}_mfd_flow_dir.tif')
         flow_dir_task = task_graph.add_task(
             func=calc_flow_dir,
