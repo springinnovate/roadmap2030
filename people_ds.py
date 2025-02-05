@@ -102,6 +102,7 @@ ANALYSIS_TUPLES = {
     '292-299-312': (
         './data/aois/final_pilot/292-299-312_wg84.gpkg',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif',
+        './data/aois/final_pilot/manual_ak_watershed.shp',
     ),
      # '106': (
      #    './data/aois/final_pilot/106.gpkg',
@@ -389,7 +390,13 @@ def main():
     result = collections.defaultdict(lambda: collections.defaultdict(lambda: collections.defaultdict(dict)))
     file = open('log.txt', 'w')
     clipped_dem_work_list = []
-    for analysis_id, (aoi_vector_path, dem_raster_path) in ANALYSIS_TUPLES.items():
+    for analysis_id, payload in ANALYSIS_TUPLES.items():
+        subset_subwatersheds_vector_path = None
+        if len(payload) == 2:
+            (aoi_vector_path, dem_raster_path) = payload
+        elif len(payload == 3):
+            (aoi_vector_path, dem_raster_path, subset_subwatersheds_vector_path) = payload
+
         local_workspace_dir = os.path.join(OUTPUT_DIR, analysis_id)
         os.makedirs(local_workspace_dir, exist_ok=True)
 
@@ -405,13 +412,16 @@ def main():
             target_path_list=[reprojected_aoi_vector_path],
             task_name=f'reproject {analysis_id}')
 
-        subset_subwatersheds_vector_path = os.path.join(local_workspace_dir, f'subwatershed_{analysis_id}.gpkg')
-        subset_task = task_graph.add_task(
-            func=subset_subwatersheds,
-            args=(reprojected_aoi_vector_path, GLOBAL_SUBWATERSHEDS_VECTOR_PATH, subset_subwatersheds_vector_path),
-            dependent_task_list=[reproject_task],
-            target_path_list=[subset_subwatersheds_vector_path],
-            task_name=f'subset subwatersheds for {analysis_id}')
+        if subset_subwatersheds_vector_path is None:
+            subset_subwatersheds_vector_path = os.path.join(local_workspace_dir, f'subwatershed_{analysis_id}.gpkg')
+            subset_task = task_graph.add_task(
+                func=subset_subwatersheds,
+                args=(reprojected_aoi_vector_path, GLOBAL_SUBWATERSHEDS_VECTOR_PATH, subset_subwatersheds_vector_path),
+                dependent_task_list=[reproject_task],
+                target_path_list=[subset_subwatersheds_vector_path],
+                task_name=f'subset subwatersheds for {analysis_id}')
+        else:
+            subset_task = task_graph.add_task()
 
         flow_dir_path = os.path.join(local_workspace_dir, f'{analysis_id}_mfd_flow_dir.tif')
         flow_dir_task = task_graph.add_task(
