@@ -25,7 +25,7 @@ logging.getLogger('fiona').setLevel(logging.WARN)
 
 DEM_PATH = r"D:/repositories/downstream-beneficiaries/workspace/global_dem_3s_md5_22d0c3809af491fa09d03002bdf09748/global_dem_3s"
 
-PERCENTILES_LIST = [10, 25, 75, 90]
+PERCENTILES_LIST = []
 
 # report the area in the clipped raster that has values >= to these values
 THRESHOLD_AREA_LIST = [0.9, 0.75, 0.5]

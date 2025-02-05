@@ -40,67 +40,69 @@ BUFFER_AMOUNTS_IN_PIXELS_M = [
     for x in range(0, 6)]  # try buffer zones of 0-5km
 
 GLOBAL_SUBWATERSHEDS_VECTOR_PATH = './data/hydrosheds/global_lev05.gpkg'
+#GLOBAL_SUBWATERSHEDS_VECTOR_PATH = './data/subwatersheds/hybas_ar_lev05_intersect_Arctic_ar.gpkg'
 
 ANALYSIS_TUPLES = {
-     '105': (
-        './data/aois/final_pilot/105.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_105.tif.tif'
+    # '105': (
+    #    './data/aois/final_pilot/105.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_105.tif.tif'
+    #    ),
+    # '106': (
+    #    './data/aois/final_pilot/106.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_106.tif.tif'
+    #    ),
+    # '107': (
+    #    './data/aois/final_pilot/107.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_107.tif.tif'
+    #    ),
+    # '110': (
+    #    './data/aois/final_pilot/110.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_110.tif.tif'
+    #    ),
+    # '118_combined': (
+    #    './data/aois/final_pilot/118_combined.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_118_combined.tif.tif'
+    #    ),
+    # '120': (
+    #    './data/aois/final_pilot/120.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_120.tif.tif'
+    #    ),
+    # '133': (
+    #    './data/aois/final_pilot/133.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_133.tif.tif'
+    #    ),
+    # '158-199': (
+    #    './data/aois/final_pilot/158-199.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_158-199.tif.tif'
+    #    ),
+    # '196': (
+    #    './data/aois/final_pilot/196.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_196.tif.tif'
+    #    ),
+    # '23': (
+    #    './data/aois/final_pilot/23.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_23.tif.tif'
+    #    ),
+    # '300-302': (
+    #    './data/aois/final_pilot/300-302.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_300-302.tif.tif'
+    #    ),
+    # '313': (
+    #    './data/aois/final_pilot/313.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_313.tif.tif'
+    #    ),
+    # '37': (
+    #    './data/aois/final_pilot/37.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_37.tif.tif'
+    #    ),
+    # '49': (
+    #    './data/aois/final_pilot/49.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_49.tif.tif'
+    #    ),
+     '292-299-312': (
+        './data/aois/final_pilot/292-299-312_wgs84.gpkg',
+        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif',
         ),
-     '106': (
-        './data/aois/final_pilot/106.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_106.tif.tif'
-        ),
-     '107': (
-        './data/aois/final_pilot/107.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_107.tif.tif'
-        ),
-     '110': (
-        './data/aois/final_pilot/110.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_110.tif.tif'
-        ),
-     '118_combined': (
-        './data/aois/final_pilot/118_combined.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_118_combined.tif.tif'
-        ),
-     '120': (
-        './data/aois/final_pilot/120.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_120.tif.tif'
-        ),
-     '133': (
-        './data/aois/final_pilot/133.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_133.tif.tif'
-        ),
-     '158-199': (
-        './data/aois/final_pilot/158-199.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_158-199.tif.tif'
-        ),
-     '196': (
-        './data/aois/final_pilot/196.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_196.tif.tif'
-        ),
-     '23': (
-        './data/aois/final_pilot/23.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_23.tif.tif'
-        ),
-     '300-302': (
-        './data/aois/final_pilot/300-302.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_300-302.tif.tif'
-        ),
-     '313': (
-        './data/aois/final_pilot/313.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_313.tif.tif'
-        ),
-     '37': (
-        './data/aois/final_pilot/37.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_37.tif.tif'
-        ),
-     '49': (
-        './data/aois/final_pilot/49.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_49.tif.tif'
-        ),
-
-
-
     # '37_GEF_Peru': (
     #    './data/37_GEF_Peru.gpkg',
     #    './data/subwatersheds/hybas_sa_lev05_Amazon.gpkg',
@@ -203,7 +205,6 @@ ANALYSIS_TUPLES = {
 OUTPUT_DIR = './people_ds_results_900_v2'
 for dirpath in [OUTPUT_DIR,]:
     os.makedirs(dirpath, exist_ok=True)
-
 
 
 def calc_flow_dir(analysis_id, base_dem_raster_path, aoi_vector_path, target_flow_dir_path):
