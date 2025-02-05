@@ -100,7 +100,7 @@ ANALYSIS_TUPLES = {
     #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_49.tif.tif'
     #    ),
     '292-299-312': (
-        './data/aois/final_pilot/292-299-312_wgs84.gpkg',
+        './data/aois/final_pilot/292-299-312_wg84.gpkg',
         './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif',
     ),
      # '106': (
