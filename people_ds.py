@@ -394,7 +394,7 @@ def main():
         subset_subwatersheds_vector_path = None
         if len(payload) == 2:
             (aoi_vector_path, dem_raster_path) = payload
-        elif len(payload == 3):
+        elif len(payload) == 3:
             (aoi_vector_path, dem_raster_path, subset_subwatersheds_vector_path) = payload
 
         local_workspace_dir = os.path.join(OUTPUT_DIR, analysis_id)
