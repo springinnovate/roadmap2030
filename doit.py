@@ -379,7 +379,7 @@ def get_area_stats(raster_path, thresholds):
     if srs.IsGeographic():
         warp_srs = osr.SpatialReference()
         # Mollweide (World), epsg code does not work
-        warp_srs.warp_srsImportFromProj4("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +R=6371007 +units=m +no_defs")
+        warp_srs.ImportFromProj4("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +R=6371007 +units=m +no_defs")
         warped_ds = gdal.Warp(
             '', r, format='MEM',
             dstSRS=warp_srs,
