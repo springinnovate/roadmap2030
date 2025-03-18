@@ -419,21 +419,15 @@ def get_stats(raster_path):
     array = b.ReadAsArray()
     nodata = b.GetNoDataValue()
     array = array[(array != nodata) & ~numpy.isnan(array)]
-
-    if array.size > 0:
-        stats = {
-            'min': numpy.min(array),
-            'max': numpy.max(array),
-            'sum': numpy.sum(array),
-            'mean': numpy.mean(array)
-        }
-    else:
-        stats = {
-            'min': 0.0,
-            'max': 0.0,
-            'sum': 0.0,
-            'mean': 0.0
-        }
+    if array.size == 0:
+        # guard against a nodata array
+        array = numpy.array([0.0])
+    stats = {
+        'min': numpy.min(array),
+        'max': numpy.max(array),
+        'sum': numpy.sum(array),
+        'mean': numpy.mean(array)
+    }
 
     percentile_dict = {
         f'p{percentile}': value
@@ -446,7 +440,6 @@ def get_stats(raster_path):
     value_thresholds = get_area_stats(raster_path, THRESHOLD_AREA_LIST)
 
     stats.update(value_thresholds)
-
 
     return stats
 
