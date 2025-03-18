@@ -44,12 +44,12 @@ GLOBAL_SUBWATERSHEDS_VECTOR_PATH = './data/hydrosheds/global_lev05.gpkg'
 
 ANALYSIS_TUPLES = {
      'great_bear_pfp': (
-        './data/aois/final_pilot/great_bear_pfp_in_m.gpkg',
+        './data/aois/great_bear_pfp_in_m.gpkg',
         #'./data/dem_rasters/merged_rasters/.tif' #NEED A DEM!
         r"D:\repositories\dem_precondition\data\astgtm_compressed.tif"
         ),
      'costa_rica_pfp': (
-        './data/aois/final_pilot/costa_rica_pfp_in_m.gpkg',
+        './data/aois/costa_rica_pfp_in_m.gpkg',
         #'./data/dem_rasters/merged_rasters/.tif' #NEED A DEM!
         r"D:\repositories\dem_precondition\data\astgtm_compressed.tif"
         ),
