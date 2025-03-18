@@ -23,12 +23,12 @@ logging.getLogger('PIL').setLevel(logging.ERROR)
 logging.getLogger('ecoshard.taskgraph').setLevel(logging.INFO)
 logging.getLogger('fiona').setLevel(logging.WARN)
 
-DEM_PATH = r"D:/repositories/downstream-beneficiaries/workspace/global_dem_3s_md5_22d0c3809af491fa09d03002bdf09748/global_dem_3s"
+#DEM_PATH = r"D:/repositories/downstream-beneficiaries/workspace/global_dem_3s_md5_22d0c3809af491fa09d03002bdf09748/global_dem_3s"
 
 PERCENTILES_LIST = []
 
 # report the area in the clipped raster that has values >= to these values
-THRESHOLD_AREA_LIST = [0.9, 0.75, 0.5]
+THRESHOLD_AREA_LIST = []
 
 BASE_RASTER_LOOKUP = {
     #'lspop2019': r"D:\repositories\roadmap2030\data/pop_rasters/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif",
@@ -45,30 +45,30 @@ BASE_RASTER_LOOKUP = {
     ##'coastal_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\coastal_risk_tnc_esa2020_value_md5_f9f644.tif",
     #'nitrogen_reference_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_sc3v2pnvall_compressed_md5_09bc65fe1cd54b518cde859f57513d8c.tif",
     #'nitrogen_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_sc3v1pnvnoag_compressed_md5_bd5a856e0c1f76b2e8898f533ec20659.tif",
-    #'nitrogen_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_tnc_2020-1992_change_val_md5_18a2b3.tif",
-    #'nitrogen_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_tnc_esa2020_compressed_md5_1d3c17.tif",
-    #'pollination_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif",
-    #'pollination_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag.tif",
-    #'pollination_2020v2': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_ppl_fed_on_ag_10s_tnc_esa2020ag_compressed_md5_8b5ee8.tif",
-    #'pollination_2020v1': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\polllination_on_ag_ESA2020mar_md5_da610a.tif",
-    #'sediment_reference_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_pnv_compressed_md5_a1faed.tif",
-    #'sediment_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_sc3v1pnvnoag_compressed_md5_2783ee50e908a763622d3167669b60bc.tif",
-    #'sediment_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_tnc_ESA_2020-1992_change_md5_0ab0cf.tif",
-    #'sediment_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_tnc_ESA_2020_compressed_md5_a988c0.tif",
-    #'n_retention_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_retention_esamod2_compressed_md5_30d56daec1140d031aa62a2bd6fe1f63.tif",
-    #'n_retention_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_retention_sc3v1pnvnoag_compressed_md5_ffb5af20f07c64deb67fcd2e0ffd628d.tif",
-    #'sed_retention_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_retention_esamod2_compressed_md5_c7a77e50feaea7a5dc7322cd63f0f429.tif",
-    #'sed_retention_ref': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_retention_sc3v1pnvnoag_compressed_md5_f6def2b90f231703e813dea293e67fd2.tif",
-    #'sed_retention_ref_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_retention_sc3v2pnvall_compressed_md5_f3c11ea7d473237be2b1dadaa9efb172.tif",
-    #'sed_deposition_ref': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_deposition_sc3v1pnvnoag_compressed_md5_d6eeb1717eff44d89f19a57dceab6328.tif",
-    #'sed_deposition_ref_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_deposition_sc3v2pnvall_compressed_md5_4c7847e31c5f7afc9ef39e3abec1912d.tif",
-    #'sed_deposition_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_deposition_esamod2_compressed_md5_ff134776cd7d9d69dc5e2fe14b53474c.tif",
-    #'flood_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\flood_nathab_md5_eb8fd58621e00c6aeb80f4483da1b35c.tif",
-    #'poll_suff_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\poll_suff_ag_coverage_prop_10s_ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif",
-    #'carbon_reference_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\restoration_limited_md5_372bdfd9ffaf810b5f68ddeb4704f48f_forest_projected_full_forest_edge_result.tif",
-    #'carbon_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\restoration_limited_md5_372bdfd9ffaf810b5f68ddeb4704f48f_forest_projected_no_forest_edge_result.tif",
-    #'carbon_2000': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2000_compressed_std_forest_edge_result.tif",
-    #'carbon_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2020_compressed_std_forest_edge_result.tif",
+#    'nitrogen_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_tnc_2020-1992_change_val_md5_18a2b3.tif",
+#    'nitrogen_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_tnc_esa2020_compressed_md5_1d3c17.tif",
+#    'pollination_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif",
+#    #'pollination_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag.tif",
+#    'pollination_2020v2': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_ppl_fed_on_ag_10s_tnc_esa2020ag_compressed_md5_8b5ee8.tif",
+#    'pollination_2020v1': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\polllination_on_ag_ESA2020mar_md5_da610a.tif",
+#    #'sediment_reference_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_pnv_compressed_md5_a1faed.tif",
+#    #'sediment_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_sc3v1pnvnoag_compressed_md5_2783ee50e908a763622d3167669b60bc.tif",
+#    'sediment_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_tnc_ESA_2020-1992_change_md5_0ab0cf.tif",
+#    'sediment_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_tnc_ESA_2020_compressed_md5_a988c0.tif",
+#    #'n_retention_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_retention_esamod2_compressed_md5_30d56daec1140d031aa62a2bd6fe1f63.tif",
+#    #'n_retention_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_retention_sc3v1pnvnoag_compressed_md5_ffb5af20f07c64deb67fcd2e0ffd628d.tif",
+#    #'sed_retention_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_retention_esamod2_compressed_md5_c7a77e50feaea7a5dc7322cd63f0f429.tif",
+#    #'sed_retention_ref': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_retention_sc3v1pnvnoag_compressed_md5_f6def2b90f231703e813dea293e67fd2.tif",
+#    #'sed_retention_ref_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_retention_sc3v2pnvall_compressed_md5_f3c11ea7d473237be2b1dadaa9efb172.tif",
+#    #'sed_deposition_ref': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_deposition_sc3v1pnvnoag_compressed_md5_d6eeb1717eff44d89f19a57dceab6328.tif",
+#    #'sed_deposition_ref_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_deposition_sc3v2pnvall_compressed_md5_4c7847e31c5f7afc9ef39e3abec1912d.tif",
+#    #'sed_deposition_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_deposition_esamod2_compressed_md5_ff134776cd7d9d69dc5e2fe14b53474c.tif",
+#    #'flood_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\flood_nathab_md5_eb8fd58621e00c6aeb80f4483da1b35c.tif",
+#    #'poll_suff_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\poll_suff_ag_coverage_prop_10s_ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif",
+#    #'carbon_reference_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\restoration_limited_md5_372bdfd9ffaf810b5f68ddeb4704f48f_forest_projected_full_forest_edge_result.tif",
+#    #'carbon_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\restoration_limited_md5_372bdfd9ffaf810b5f68ddeb4704f48f_forest_projected_no_forest_edge_result.tif",
+#    'carbon_2000': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2000_compressed_std_forest_edge_result.tif",
+#    'carbon_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2020_compressed_std_forest_edge_result.tif",
     #'abaca': r"D:\repositories\roadmap2030\data\crop_maps\abaca_harea.tif",
     #'agave': r"D:\repositories\roadmap2030\data\crop_maps\agave_harea.tif",
     #'alfalfa': r"D:\repositories\roadmap2030\data\crop_maps\alfalfa_harea.tif",
@@ -278,27 +278,45 @@ BASE_RASTER_LOOKUP = {
 
 
 VECTOR_PATH_LOOKUP = {
-    '37_GEF_Peru': r"D:\repositories\roadmap2030\data\37_GEF_Peru.gpkg",
-    '49_GEF_Guyana_KPMA_NRW': r"D:\repositories\roadmap2030\data\49_GEF_Guyana_KPMA_NRW.gpkg",
-    '105_Arpa_nonoverlapping_clipped': r"D:\repositories\roadmap2030\data\105_Arpa_nonoverlapping_clipped.gpkg",
-    '106_HECO': r"D:\repositories\roadmap2030\data\106_HECO.gpkg",
-    '110_PatriomonioPeru': r"D:\repositories\roadmap2030\data\110_PatriomonioPeru.gpkg",
-    '118_NBSOP2': r"D:\repositories\roadmap2030\data\118_NBSOP2.gpkg",
-    '118_NBSOP3': r"D:\repositories\roadmap2030\data\118_NBSOP3.gpkg",
-    '118_NBSOP4': r"D:\repositories\roadmap2030\data\118_NBSOP4.gpkg",
-    '120_Tapajos': r"D:\repositories\roadmap2030\data\120_Tapajos.gpkg",
-    '133_Sall': r"D:\repositories\roadmap2030\data\133_Sall.gpkg",
-    'All_WWF_Amazon': r"D:\repositories\roadmap2030\data\000_All_WWF_Amazon_sites.gpkg",
-    'Amazon': r"D:\repositories\roadmap2030\data\Amazon_aoi.gpkg",
-    'non-arpa': r"D:\repositories\roadmap2030\data\non-Arpa_nonoverlapping-in-m.gpkg",
-    'arpa': r"D:\repositories\roadmap2030\data\Arpa_nonoverlapping-in-m.gpkg",
-    'colombia': r"D:\repositories\roadmap2030\data\Colombia.gpkg",
-    'peru': r"D:\repositories\roadmap2030\data\Peru.gpkg",
-    'tapajos': r"D:\repositories\roadmap2030\data\Tapajos.gpkg",
-    'NGP': r"D:\repositories\roadmap2030\data\NGP.gpkg",
-    'RGBR': r"D:\repositories\roadmap2030\data\RGRB.gpkg",
-    'Arctic': r"D:\repositories\roadmap2030\data\Arctic.gpkg",
-    '105': r"D:\repositories\roadmap2030\data\aois\final_pilot\105.gpkg",
+    #'37_GEF_Peru': r"D:\repositories\roadmap2030\data\37_GEF_Peru.gpkg",
+    #'49_GEF_Guyana_KPMA_NRW': r"D:\repositories\roadmap2030\data\49_GEF_Guyana_KPMA_NRW.gpkg",
+    #'105_Arpa_nonoverlapping_clipped': r"D:\repositories\roadmap2030\data\105_Arpa_nonoverlapping_clipped.gpkg",
+    #'106_HECO': r"D:\repositories\roadmap2030\data\106_HECO.gpkg",
+    #'110_PatriomonioPeru': r"D:\repositories\roadmap2030\data\110_PatriomonioPeru.gpkg",
+    #'118_NBSOP2': r"D:\repositories\roadmap2030\data\118_NBSOP2.gpkg",
+    #'118_NBSOP3': r"D:\repositories\roadmap2030\data\118_NBSOP3.gpkg",
+    #'118_NBSOP4': r"D:\repositories\roadmap2030\data\118_NBSOP4.gpkg",
+    #'120_Tapajos': r"D:\repositories\roadmap2030\data\120_Tapajos.gpkg",
+    #'133_Sall': r"D:\repositories\roadmap2030\data\133_Sall.gpkg",
+    #'All_WWF_Amazon': r"D:\repositories\roadmap2030\data\000_All_WWF_Amazon_sites.gpkg",
+    #'Amazon': r"D:\repositories\roadmap2030\data\Amazon_aoi.gpkg",
+    #'non-arpa': r"D:\repositories\roadmap2030\data\non-Arpa_nonoverlapping-in-m.gpkg",
+    #'arpa': r"D:\repositories\roadmap2030\data\Arpa_nonoverlapping-in-m.gpkg",
+    #'colombia': r"D:\repositories\roadmap2030\data\Colombia.gpkg",
+    #'peru': r"D:\repositories\roadmap2030\data\Peru.gpkg",
+    #'tapajos': r"D:\repositories\roadmap2030\data\Tapajos.gpkg",
+    #'NGP': r"D:\repositories\roadmap2030\data\NGP.gpkg",
+    #'RGBR': r"D:\repositories\roadmap2030\data\RGRB.gpkg",
+    #'Arctic': r"D:\repositories\roadmap2030\data\Arctic.gpkg",
+    #'105': r"D:\repositories\roadmap2030\data\aois\final_pilot\105.gpkg",
+    #'106': r"D:\repositories\roadmap2030\data\aois\final_pilot\106.gpkg",
+    #'110': r"D:\repositories\roadmap2030\data\aois\final_pilot\110.gpkg",
+    #'118_combined': r"D:\repositories\roadmap2030\data\aois\final_pilot\118_combined.gpkg",
+    #'120': r"D:\repositories\roadmap2030\data\aois\final_pilot\120.gpkg",
+    #'133': r"D:\repositories\roadmap2030\data\aois\final_pilot\133.gpkg",
+    #'199': r"D:\repositories\roadmap2030\data\aois\final_pilot\158-199.gpkg",
+    #'196': r"D:\repositories\roadmap2030\data\aois\final_pilot\196.gpkg",
+    #'23': r"D:\repositories\roadmap2030\data\aois\final_pilot\23.gpkg",
+    #'312': r"D:\repositories\roadmap2030\data\aois\final_pilot\292-299-312.gpkg",
+    #'312_wg84': r"D:\repositories\roadmap2030\data\aois\final_pilot\292-299-312_wg84.gpkg",
+    #'302': r"D:\repositories\roadmap2030\data\aois\final_pilot\300-302.gpkg",
+    #'313': r"D:\repositories\roadmap2030\data\aois\final_pilot\313.gpkg",
+    #'37': r"D:\repositories\roadmap2030\data\aois\final_pilot\37.gpkg",
+    #'49': r"D:\repositories\roadmap2030\data\aois\final_pilot\49.gpkg",
+    'costa_rica_pfp': r"D:\repositories\roadmap2030\data\aois\costa_rica_pfp_in_m.gpkg",
+    'costa_rica': r"D:\repositories\roadmap2030\data\aois\costa_rica_in_m.gpkg",
+    'great_bear_pfp': r"D:\repositories\roadmap2030\data\aois\great_bear_pfp_in_m.gpkg",
+    'british_columbia': r"D:\repositories\roadmap2030\data\aois\british_columbia_in_m.gpkg"
 }
 
 OUTPUT_DIR = './results'
@@ -313,7 +331,7 @@ def vector_area_in_ha(vector_path):
 
     source_srs = layer.GetSpatialRef()
     target_srs = osr.SpatialReference()
-    target_srs.ImportFromEPSG(54009)
+    target_srs.ImportFromProj4("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +R=6371007 +units=m +no_defs")
 
     total_area_m2 = 0
 

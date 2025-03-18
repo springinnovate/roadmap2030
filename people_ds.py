@@ -43,6 +43,14 @@ GLOBAL_SUBWATERSHEDS_VECTOR_PATH = './data/hydrosheds/global_lev05.gpkg'
 #GLOBAL_SUBWATERSHEDS_VECTOR_PATH = './data/subwatersheds/hybas_ar_lev05_intersect_Arctic_ar.gpkg'
 
 ANALYSIS_TUPLES = {
+     'great_bear_pfp': (
+        './data/aois/final_pilot/great_bear_pfp_in_m.gpkg',
+        './data/dem_rasters/merged_rasters/.tif' #NEED A DEM!
+        ),
+     'costa_rica_pfp': (
+        './data/aois/final_pilot/costa_rica_pfp_in_m.gpkg',
+        './data/dem_rasters/merged_rasters/.tif' #NEED A DEM!
+        ),
     # '105': (
     #    './data/aois/final_pilot/105.gpkg',
     #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_105.tif.tif'
@@ -99,11 +107,11 @@ ANALYSIS_TUPLES = {
     #    './data/aois/final_pilot/49.gpkg',
     #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_49.tif.tif'
     #    ),
-    '292-299-312': (
-        './data/aois/final_pilot/292-299-312_wg84.gpkg',
-        './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif',
-        './data/aois/final_pilot/manual_ak_watershed.shp',
-    ),
+    #'292-299-312': (
+    #    './data/aois/final_pilot/292-299-312_wg84.gpkg',
+    #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_hybas_ar_lev05_intersect_Arctic_ar.tif_merged_compressed.tif',
+    #    './data/aois/final_pilot/manual_ak_watershed.shp',
+    #   ),
      # '106': (
      #    './data/aois/final_pilot/106.gpkg',
      #    './data/dem_rasters/merged_rasters/JAXA_ALOS_AW3D30_V3_2_106.tif.tif'
