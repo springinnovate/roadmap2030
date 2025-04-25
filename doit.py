@@ -15,15 +15,19 @@ logging.basicConfig(
     level=logging.DEBUG,
     stream=sys.stdout,
     format=(
-        '%(asctime)s (%(relativeCreated)d) %(levelname)s %(name)s'
-        ' [%(pathname)s.%(funcName)s:%(lineno)d] %(message)s'))
+        "%(asctime)s (%(relativeCreated)d) %(levelname)s %(name)s"
+        " [%(pathname)s.%(funcName)s:%(lineno)d] %(message)s"
+    ),
+)
 LOGGER = logging.getLogger(__name__)
-logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
-logging.getLogger('PIL').setLevel(logging.ERROR)
-logging.getLogger('ecoshard.taskgraph').setLevel(logging.INFO)
-logging.getLogger('fiona').setLevel(logging.WARN)
+logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
+logging.getLogger("PIL").setLevel(logging.ERROR)
+logging.getLogger("ecoshard.taskgraph").setLevel(logging.INFO)
+logging.getLogger("fiona").setLevel(logging.WARN)
 
-#DEM_PATH = r"D:/repositories/downstream-beneficiaries/workspace/global_dem_3s_md5_22d0c3809af491fa09d03002bdf09748/global_dem_3s"
+# DEM_PATH = r"D:/repositories/downstream-beneficiaries/workspace/global_dem_3s_md5_22d0c3809af491fa09d03002bdf09748/global_dem_3s"
+
+AOI_PATH = r"D:\repositories\roadmap2030\data\aois\SOKNOT_landscapes.gpkg"
 
 PERCENTILES_LIST = []
 
@@ -45,16 +49,16 @@ BASE_RASTER_LOOKUP = {
     ##'coastal_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\coastal_risk_tnc_esa2020_value_md5_f9f644.tif",
     #'nitrogen_reference_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_sc3v2pnvall_compressed_md5_09bc65fe1cd54b518cde859f57513d8c.tif",
     #'nitrogen_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_sc3v1pnvnoag_compressed_md5_bd5a856e0c1f76b2e8898f533ec20659.tif",
-    'nitrogen_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_tnc_2020-1992_change_val_md5_18a2b3.tif",
-    'nitrogen_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_tnc_esa2020_compressed_md5_1d3c17.tif",
-    'pollination_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif",
+    "nitrogen_change": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_tnc_2020-1992_change_val_md5_18a2b3.tif",
+    "nitrogen_2020": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_export_tnc_esa2020_compressed_md5_1d3c17.tif",
+    "pollination_change": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif",
     #'pollination_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag.tif",
-    'pollination_2020v2': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_ppl_fed_on_ag_10s_tnc_esa2020ag_compressed_md5_8b5ee8.tif",
-    'pollination_2020v1': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\polllination_on_ag_ESA2020mar_md5_da610a.tif",
+    "pollination_2020v2": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\pollination_ppl_fed_on_ag_10s_tnc_esa2020ag_compressed_md5_8b5ee8.tif",
+    "pollination_2020v1": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\polllination_on_ag_ESA2020mar_md5_da610a.tif",
     #'sediment_reference_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_pnv_compressed_md5_a1faed.tif",
     #'sediment_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_sc3v1pnvnoag_compressed_md5_2783ee50e908a763622d3167669b60bc.tif",
-    'sediment_change': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_tnc_ESA_2020-1992_change_md5_0ab0cf.tif",
-    'sediment_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_tnc_ESA_2020_compressed_md5_a988c0.tif",
+    "sediment_change": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_tnc_ESA_2020-1992_change_md5_0ab0cf.tif",
+    "sediment_2020": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_export_tnc_ESA_2020_compressed_md5_a988c0.tif",
     #'n_retention_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_retention_esamod2_compressed_md5_30d56daec1140d031aa62a2bd6fe1f63.tif",
     #'n_retention_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\n_retention_sc3v1pnvnoag_compressed_md5_ffb5af20f07c64deb67fcd2e0ffd628d.tif",
     #'sed_retention_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\sed_retention_esamod2_compressed_md5_c7a77e50feaea7a5dc7322cd63f0f429.tif",
@@ -67,8 +71,8 @@ BASE_RASTER_LOOKUP = {
     #'poll_suff_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\poll_suff_ag_coverage_prop_10s_ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif",
     #'carbon_reference_full': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\restoration_limited_md5_372bdfd9ffaf810b5f68ddeb4704f48f_forest_projected_full_forest_edge_result.tif",
     #'carbon_reference': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\restoration_limited_md5_372bdfd9ffaf810b5f68ddeb4704f48f_forest_projected_no_forest_edge_result.tif",
-    'carbon_2000': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2000_compressed_std_forest_edge_result.tif",
-    'carbon_2020': r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2020_compressed_std_forest_edge_result.tif",
+    "carbon_2000": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2000_compressed_std_forest_edge_result.tif",
+    "carbon_2020": r"D:\repositories\roadmap2030\data\ABUNCHASERVICES\fc_stack_hansen_forest_cover2020_compressed_std_forest_edge_result.tif",
     #'abaca': r"D:\repositories\roadmap2030\data\crop_maps\abaca_harea.tif",
     #'agave': r"D:\repositories\roadmap2030\data\crop_maps\agave_harea.tif",
     #'alfalfa': r"D:\repositories\roadmap2030\data\crop_maps\alfalfa_harea.tif",
@@ -313,14 +317,14 @@ VECTOR_PATH_LOOKUP = {
     #'313': r"D:\repositories\roadmap2030\data\aois\final_pilot\313.gpkg",
     #'37': r"D:\repositories\roadmap2030\data\aois\final_pilot\37.gpkg",
     #'49': r"D:\repositories\roadmap2030\data\aois\final_pilot\49.gpkg",
-    'costa_rica_pfp': r"D:\repositories\roadmap2030\data\aois\costa_rica_pfp_in_m.gpkg",
-    'costa_rica': r"D:\repositories\roadmap2030\data\aois\costa_rica_in_m.gpkg",
-    'great_bear_pfp': r"D:\repositories\roadmap2030\data\aois\great_bear_pfp_in_m.gpkg",
-    'british_columbia': r"D:\repositories\roadmap2030\data\aois\british_columbia_in_m.gpkg"
+    "costa_rica_pfp": r"D:\repositories\roadmap2030\data\aois\costa_rica_pfp_in_m.gpkg",
+    "costa_rica": r"D:\repositories\roadmap2030\data\aois\costa_rica_in_m.gpkg",
+    "great_bear_pfp": r"D:\repositories\roadmap2030\data\aois\great_bear_pfp_in_m.gpkg",
+    "british_columbia": r"D:\repositories\roadmap2030\data\aois\british_columbia_in_m.gpkg",
 }
 
-OUTPUT_DIR = './results'
-CLIPPED_DIR = os.path.join(OUTPUT_DIR, 'clipped')
+OUTPUT_DIR = "./results"
+CLIPPED_DIR = os.path.join(OUTPUT_DIR, "clipped")
 for dirpath in [OUTPUT_DIR, CLIPPED_DIR]:
     os.makedirs(dirpath, exist_ok=True)
 
@@ -331,7 +335,9 @@ def vector_area_in_ha(vector_path):
 
     source_srs = layer.GetSpatialRef()
     target_srs = osr.SpatialReference()
-    target_srs.ImportFromProj4("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +R=6371007 +units=m +no_defs")
+    target_srs.ImportFromProj4(
+        "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +R=6371007 +units=m +no_defs"
+    )
 
     total_area_m2 = 0
 
@@ -348,27 +354,35 @@ def vector_area_in_ha(vector_path):
 
 
 def create_subset(gdf, name, target_vector_path):
-    LOGGER.info(f'creating subset of {name}')
+    LOGGER.info(f"creating subset of {name}")
     subset_gdf = gdf[gdf["Name"] == name]
     subset_gdf.to_file(target_vector_path, driver="GPKG")
-    LOGGER.info(f'done with subset of {name}')
+    LOGGER.info(f"done with subset of {name}")
 
 
 def clip_raster(base_raster_path, summary_vector_path, temp_clip_path):
     base_raster_info = geoprocessing.get_raster_info(base_raster_path)
     summary_vector_info = geoprocessing.get_vector_info(summary_vector_path)
-    target_pixel_size = base_raster_info['pixel_size']
-    base_vector_bb = summary_vector_info['bounding_box']
+    target_pixel_size = base_raster_info["pixel_size"]
+    base_vector_bb = summary_vector_info["bounding_box"]
 
     target_bb = geoprocessing.transform_bounding_box(
-        base_vector_bb, summary_vector_info['projection_wkt'],
-        base_raster_info['projection_wkt'])
+        base_vector_bb,
+        summary_vector_info["projection_wkt"],
+        base_raster_info["projection_wkt"],
+    )
 
     geoprocessing.warp_raster(
-        base_raster_path, target_pixel_size, temp_clip_path,
-        'near', target_bb=target_bb, vector_mask_options={
-            'mask_vector_path': summary_vector_path,
-            'all_touched': True})
+        base_raster_path,
+        target_pixel_size,
+        temp_clip_path,
+        "near",
+        target_bb=target_bb,
+        vector_mask_options={
+            "mask_vector_path": summary_vector_path,
+            "all_touched": True,
+        },
+    )
 
 
 def get_area_stats(raster_path, thresholds):
@@ -379,11 +393,15 @@ def get_area_stats(raster_path, thresholds):
     if srs.IsGeographic():
         warp_srs = osr.SpatialReference()
         # Mollweide (World), epsg code does not work
-        warp_srs.ImportFromProj4("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +R=6371007 +units=m +no_defs")
+        warp_srs.ImportFromProj4(
+            "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +R=6371007 +units=m +no_defs"
+        )
         warped_ds = gdal.Warp(
-            '', r, format='MEM',
+            "",
+            r,
+            format="MEM",
             dstSRS=warp_srs,
-            resampleAlg=gdal.GRA_NearestNeighbour
+            resampleAlg=gdal.GRA_NearestNeighbour,
         )
     else:
         warped_ds = r
@@ -394,7 +412,7 @@ def get_area_stats(raster_path, thresholds):
 
     valid_mask = numpy.ones_like(arr, dtype=bool)
     if nodata is not None:
-        valid_mask &= (arr != nodata)
+        valid_mask &= arr != nodata
     valid_mask &= ~numpy.isnan(arr)
     arr = arr[valid_mask]
 
@@ -405,10 +423,10 @@ def get_area_stats(raster_path, thresholds):
     for thr in thresholds:
         pix_count = numpy.count_nonzero(arr >= thr)
         area_ha = (pix_count * pixel_area_m2) / 10000.0  # 1 ha = 10,000 m^2
-        results[f'area_ge_{thr}'] = area_ha
+        results[f"area_ge_{thr}"] = area_ha
 
     area_ha = (arr.size * pixel_area_m2) / 10000.0  # 1 ha = 10,000 m^2
-    results['area_ha'] = area_ha
+    results["area_ha"] = area_ha
 
     return results
 
@@ -423,17 +441,17 @@ def get_stats(raster_path):
         # guard against a nodata array
         array = numpy.array([0.0])
     stats = {
-        'min': numpy.min(array),
-        'max': numpy.max(array),
-        'sum': numpy.sum(array),
-        'mean': numpy.mean(array)
+        "min": numpy.min(array),
+        "max": numpy.max(array),
+        "sum": numpy.sum(array),
+        "mean": numpy.mean(array),
     }
 
     percentile_dict = {
-        f'p{percentile}': value
+        f"p{percentile}": value
         for percentile, value in zip(
-            PERCENTILES_LIST,
-            numpy.percentile(array, PERCENTILES_LIST))
+            PERCENTILES_LIST, numpy.percentile(array, PERCENTILES_LIST)
+        )
     }
     stats.update(percentile_dict)
 
@@ -445,21 +463,27 @@ def get_stats(raster_path):
 
 
 def dump_results_to_csv(results, vector_path_lookup, csv_path):
-    with open(csv_path, 'w', newline='') as csvfile:
+    with open(csv_path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(
-            ["vector_id", "raster_name", "area_ha", "min", "max", "mean", "sum"] +
-            [f'p{percentile}' for percentile in PERCENTILES_LIST] +
-            [f'area_ge_{threshold}' for threshold in THRESHOLD_AREA_LIST])
+            ["vector_id", "raster_name", "area_ha", "min", "max", "mean", "sum"]
+            + [f"p{percentile}" for percentile in PERCENTILES_LIST]
+            + [f"area_ge_{threshold}" for threshold in THRESHOLD_AREA_LIST]
+        )
         for vector_id, info_dict in results.items():
             area_ha = info_dict.get("area_ha", None)
             if area_ha is not None:
-                writer.writerow([
-                    vector_id,
-                    "",         # raster_name is empty
-                    area_ha,
-                    "", "", "", ""  # no min/max/mean/sum for area
-                ])
+                writer.writerow(
+                    [
+                        vector_id,
+                        "",  # raster_name is empty
+                        area_ha,
+                        "",
+                        "",
+                        "",
+                        "",  # no min/max/mean/sum for area
+                    ]
+                )
 
             # Next rows: stats for each raster
             # (anything that's not "area_ha" in `results[vector_id]`)
@@ -474,62 +498,76 @@ def dump_results_to_csv(results, vector_path_lookup, csv_path):
                 r_max = stats_dict.get("max", "")
                 r_mean = stats_dict.get("mean", "")
                 r_sum = stats_dict.get("sum", "")
-                area_ha = stats_dict.get('area_ha', '')
-                writer.writerow([
-                    vector_id,
-                    raster_basename,  # raster_name
-                    area_ha,               # area_ha is empty here
-                    r_min,
-                    r_max,
-                    r_mean,
-                    r_sum
-                ] + [stats_dict.get(f'p{percentile}', '') for percentile in PERCENTILES_LIST] +
-                [stats_dict.get(f'area_ge_{thr}', '') for thr in THRESHOLD_AREA_LIST])
+                area_ha = stats_dict.get("area_ha", "")
+                writer.writerow(
+                    [
+                        vector_id,
+                        raster_basename,  # raster_name
+                        area_ha,  # area_ha is empty here
+                        r_min,
+                        r_max,
+                        r_mean,
+                        r_sum,
+                    ]
+                    + [
+                        stats_dict.get(f"p{percentile}", "")
+                        for percentile in PERCENTILES_LIST
+                    ]
+                    + [
+                        stats_dict.get(f"area_ge_{thr}", "")
+                        for thr in THRESHOLD_AREA_LIST
+                    ]
+                )
 
 
 def main():
     """Entry point."""
     print(os.cpu_count())
-    task_graph = taskgraph.TaskGraph(OUTPUT_DIR, os.cpu_count(), reporting_interval=10.0)
+    task_graph = taskgraph.TaskGraph(
+        OUTPUT_DIR, os.cpu_count(), reporting_interval=10.0
+    )
     results = collections.defaultdict(lambda: collections.defaultdict(dict))
     for vector_id, vector_path in VECTOR_PATH_LOOKUP.items():
-        results[vector_id]['area_ha'] = vector_area_in_ha(vector_path)
-        LOGGER.info(f'processing {vector_id}')
+        results[vector_id]["area_ha"] = vector_area_in_ha(vector_path)
+        LOGGER.info(f"processing {vector_id}")
         for raster_basename, raster_path in BASE_RASTER_LOOKUP.items():
             if not os.path.exists(raster_path):
-                raise RuntimeError(f'{raster_path} not found')
-            LOGGER.info(f'clipping {raster_basename} to {vector_id}')
+                raise RuntimeError(f"{raster_path} not found")
+            LOGGER.info(f"clipping {raster_basename} to {vector_id}")
             clipped_raster_path = os.path.join(
-                CLIPPED_DIR, f'{vector_id}_{raster_basename}.tif')
+                CLIPPED_DIR, f"{vector_id}_{raster_basename}.tif"
+            )
             clipped_task = task_graph.add_task(
                 func=clip_raster,
                 args=(raster_path, vector_path, clipped_raster_path),
                 ignore_path_list=[vector_path],
                 target_path_list=[clipped_raster_path],
-                task_name=f'clipping {raster_path} to {vector_path}')
+                task_name=f"clipping {raster_path} to {vector_path}",
+            )
 
             stats_task = task_graph.add_task(
                 func=get_stats,
                 args=(clipped_raster_path,),
                 dependent_task_list=[clipped_task],
                 store_result=True,
-                task_name=f'stats for {raster_path}')
-            results[vector_id][raster_basename]['stats'] = stats_task
+                task_name=f"stats for {raster_path}",
+            )
+            results[vector_id][raster_basename]["stats"] = stats_task
 
     for vector_id in VECTOR_PATH_LOOKUP:
         for raster_basename in BASE_RASTER_LOOKUP:
-            stats_task = results[vector_id][raster_basename]['stats']
+            stats_task = results[vector_id][raster_basename]["stats"]
             results[vector_id][raster_basename] = {}
             for fn_str, value in stats_task.get().items():
                 results[vector_id][raster_basename][fn_str] = value
 
     task_graph.join()
     print(results)
-    timestamp = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    output_filename = f'results_{timestamp}.csv'
+    timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    output_filename = f"results_{timestamp}.csv"
     dump_results_to_csv(results, VECTOR_PATH_LOOKUP, output_filename)
-    print(f'all done -- results in {output_filename}!')
+    print(f"all done -- results in {output_filename}!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

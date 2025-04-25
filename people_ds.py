@@ -46,12 +46,12 @@ ANALYSIS_TUPLES = {
      'great_bear_pfp': (
         './data/aois/great_bear_pfp_in_m.gpkg',
         #'./data/dem_rasters/merged_rasters/.tif' #NEED A DEM!
-        r"D:\repositories\dem_precondition\data\astgtm_compressed.tif"
+        './dem_precondition/data/astgtm_compressed.tif'
         ),
      'costa_rica_pfp': (
         './data/aois/costa_rica_pfp_in_m.gpkg',
         #'./data/dem_rasters/merged_rasters/.tif' #NEED A DEM!
-        r"D:\repositories\dem_precondition\data\astgtm_compressed.tif"
+        './dem_precondition/data/astgtm_compressed.tif'
         ),
     # '105': (
     #    './data/aois/final_pilot/105.gpkg',
