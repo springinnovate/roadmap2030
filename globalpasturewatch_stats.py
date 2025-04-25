@@ -152,7 +152,7 @@ def extract_raster_array_by_feature(
 
     arr_masked = np.where(mask, arr, nodata)
 
-    # Feature Area (ha) - Accurate calculation using equal-area projection
+    # get equal area hectars
     equal_area_sr = osr.SpatialReference()
     equal_area_sr.ImportFromEPSG(6933)  # World Equal Area CRS
     geom_equal_area = geometry.Clone()
@@ -160,10 +160,32 @@ def extract_raster_array_by_feature(
     feature_area_m2 = geom_equal_area.GetArea()
     feature_area_ha = feature_area_m2 / 10000.0
 
+    if raster_projection.IsGeographic():
+        # raster is geographic (degrees), so approximate pixel area via reprojection
+        LOGGER.info("it is in degrees so approximating via reprojection")
+        ul_x, ul_y = subset_gt[0], subset_gt[3]
+        lr_x = subset_gt[0] + xsize * subset_gt[1]
+        lr_y = subset_gt[3] + ysize * subset_gt[5]
+
+        ring = ogr.Geometry(ogr.wkbLinearRing)
+        ring.AddPoint(ul_x, ul_y)
+        ring.AddPoint(lr_x, ul_y)
+        ring.AddPoint(lr_x, lr_y)
+        ring.AddPoint(ul_x, lr_y)
+        ring.AddPoint(ul_x, ul_y)
+        bbox_geom = ogr.Geometry(ogr.wkbPolygon)
+        bbox_geom.AddGeometry(ring)
+        bbox_geom.AssignSpatialReference(raster_projection)
+        bbox_geom.TransformTo(equal_area_sr)
+        bbox_area_m2 = bbox_geom.GetArea()
+        pixel_area_m2 = bbox_area_m2 / (xsize * ysize)
+    else:
+        # raster projection in linear units (meters)
+        pixel_area_m2 = abs(gt[1] * gt[5])
+
     # Valid Pixel Area (ha)
     pixel_width, pixel_height = abs(gt[1]), abs(gt[5])
     valid_pixel_count = np.count_nonzero((arr != nodata) & mask)
-    pixel_area_m2 = pixel_width * pixel_height
     valid_pixel_area_ha = (valid_pixel_count * pixel_area_m2) / 10000.0
 
     if output_tif:
@@ -240,12 +262,12 @@ def main():
                 raster_path, AOI_PATH, fid
             )
             summary_stats = {
-                "feature_area_ha": payload["feature_area_ha"],
-                "valid_pixel_area_ha": payload["valid_pixel_area_ha"],
                 "feature name": name,
                 "raster name": os.path.splitext(os.path.basename(raster_path))[
                     0
                 ],
+                "feature_area_ha": payload["feature_area_ha"],
+                "valid_pixel_area_ha": payload["valid_pixel_area_ha"],
             }
             summary_stats.update(
                 calculate_summary_stats(payload["array"], payload["nodata"])
