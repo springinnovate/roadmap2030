@@ -16,7 +16,7 @@ import geopandas as gpd
 import pandas as pd
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     stream=sys.stdout,
     format=(
         "%(asctime)s (%(relativeCreated)d) %(levelname)s %(name)s"
@@ -244,7 +244,7 @@ def main():
     """Entry point."""
     print(os.cpu_count())
     task_graph = taskgraph.TaskGraph(
-        OUTPUT_DIR, -1  # os.cpu_count(), reporting_interval=10.0
+        OUTPUT_DIR, os.cpu_count() * 2, reporting_interval=15.0
     )
 
     vector = gdal.OpenEx(AOI_PATH)
@@ -283,12 +283,14 @@ def main():
             calculate_summary_stats(stat_dict["array"], stat_dict["nodata"])
         )
         stats_list.append(summary_stats)
-        LOGGER.debug(summary_stats)
+        LOGGER.info(f"done with {raster_path}")
 
     stats_df = pd.DataFrame(stats_list)
     timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     output_filename = f"results_{timestamp}.csv"
     stats_df.to_csv(output_filename, index=False)
+    task_graph.close()
+    task_graph.join()
     print(f"all done -- results in {output_filename}!")
 
 
