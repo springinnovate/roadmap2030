@@ -1,4 +1,5 @@
 import datetime
+import re
 import glob
 import logging
 import numpy as np
@@ -290,9 +291,24 @@ def main():
             error_list.append(payload)
             continue
         stat_dict = payload
+        raster_name = os.path.splitext(os.path.basename(raster_path))[0]
+        match = re.search(
+            r"_(\d{4})(\d{2})(\d{2})_(\d{4})(\d{2})(\d{2})_", raster_name
+        )
+        year = "unknown"
+        period = "unknown"
+        if match:
+            year_start, month_start, day_start, year_end, month_end, day_end = (
+                match.groups()
+            )
+            year = year_start
+            period = f"{month_start}-{day_start} -- {month_end}-{day_end}"
+            print(f"Year: {year}, Period: {period}")
         summary_stats = {
             "feature name": name,
-            "raster name": os.path.splitext(os.path.basename(raster_path))[0],
+            "raster name": raster_name,
+            "year": year,
+            "period": period,
             "feature_area_ha": stat_dict["feature_area_ha"],
             "valid_pixel_area_ha": stat_dict["valid_pixel_area_ha"],
         }
