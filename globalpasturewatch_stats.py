@@ -1,17 +1,19 @@
-import datetime
-import csv
 import collections
-import numpy as np
-from osgeo import osr
-from osgeo import ogr
-from osgeo import gdal
+import csv
+import datetime
+import glob
 import logging
-import sys
-from ecoshard import taskgraph
+import numpy as np
 import os
+import sys
+
+from ecoshard import geoprocessing
+from ecoshard import taskgraph
+from osgeo import gdal
+from osgeo import ogr
+from osgeo import osr
 import geopandas as gpd
 import pandas as pd
-from ecoshard import geoprocessing
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -33,9 +35,11 @@ AOI_PATH, AOI_NAME_KEY = (
 )
 
 
-RASTER_PATHS_TO_SUMMARIZE = [
-    r"Z:\data_platform\Nature\global_pasture_watch_rasters\gpw_gpp.daily.grass_lue.model_m_30m_s_20000101_20000228_go_epsg.4326_v1.tif"
-]
+RASTER_PATHS_TO_SUMMARIZE = glob.glob(
+    r"Z:/data_platform/Nature/global_pasture_watch_rasters/*.tif"
+)
+# r"Z:\data_platform\Nature\global_pasture_watch_rasters\gpw_gpp.daily.grass_lue.model_m_30m_s_20000101_20000228_go_epsg.4326_v1.tif"
+
 
 PERCENTILES_LIST = [25, 50]
 
@@ -254,26 +258,32 @@ def main():
     layer.ResetReading()
     LOGGER.debug(fid_name_set)
 
-    stats_list = []
+    payload_list = []
     for raster_path in RASTER_PATHS_TO_SUMMARIZE:
         for fid, name in fid_name_set:
             LOGGER.debug(raster_path)
-            payload = extract_raster_array_by_feature(
-                raster_path, AOI_PATH, fid
+            payload = task_graph.add_task(
+                func=extract_raster_array_by_feature,
+                args=(raster_path, AOI_PATH, fid),
+                store_result=True,
+                task_name=f"stats for {raster_path}",
             )
-            summary_stats = {
-                "feature name": name,
-                "raster name": os.path.splitext(os.path.basename(raster_path))[
-                    0
-                ],
-                "feature_area_ha": payload["feature_area_ha"],
-                "valid_pixel_area_ha": payload["valid_pixel_area_ha"],
-            }
-            summary_stats.update(
-                calculate_summary_stats(payload["array"], payload["nodata"])
-            )
-            stats_list.append(summary_stats)
-            LOGGER.debug(summary_stats)
+            payload_list.append(payload)
+
+    stats_list = []
+    for payload in payload_list:
+        stat_dict = payload.get()
+        summary_stats = {
+            "feature name": name,
+            "raster name": os.path.splitext(os.path.basename(raster_path))[0],
+            "feature_area_ha": stat_dict["feature_area_ha"],
+            "valid_pixel_area_ha": stat_dict["valid_pixel_area_ha"],
+        }
+        summary_stats.update(
+            calculate_summary_stats(stat_dict["array"], stat_dict["nodata"])
+        )
+        stats_list.append(summary_stats)
+        LOGGER.debug(summary_stats)
 
     stats_df = pd.DataFrame(stats_list)
     timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
