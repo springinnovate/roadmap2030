@@ -32,6 +32,7 @@ AOI_PATH, AOI_NAME_KEY = (
 )
 
 
+# Make a list here if you like
 RASTER_PATHS_TO_SUMMARIZE = glob.glob(
     r"Z:/data_platform/Nature/global_pasture_watch_rasters/*.tif"
 )
@@ -269,25 +270,26 @@ def main():
     layer.ResetReading()
     LOGGER.debug(fid_name_set)
 
-    payload_list = []
+    task_list = []
     for raster_path in RASTER_PATHS_TO_SUMMARIZE:
         for fid, name in fid_name_set:
             LOGGER.debug(raster_path)
-            payload = task_graph.add_task(
+            task = task_graph.add_task(
                 func=extract_raster_array_by_feature,
                 args=(raster_path, AOI_PATH, fid),
                 store_result=True,
                 task_name=f"stats for {raster_path}",
             )
-            payload_list.append(payload)
+            task_list.append((raster_path, name, task))
 
     stats_list = []
     error_list = []
-    for payload in payload_list:
-        stat_dict = payload.get()
-        if isinstance(stat_dict, str):
-            error_list.append(stat_dict)
+    for raster_path, name, task in task_list:
+        payload = task.get()
+        if isinstance(payload, str):
+            error_list.append(payload)
             continue
+        stat_dict = payload
         summary_stats = {
             "feature name": name,
             "raster name": os.path.splitext(os.path.basename(raster_path))[0],
@@ -295,9 +297,6 @@ def main():
             "valid_pixel_area_ha": stat_dict["valid_pixel_area_ha"],
         }
         summary_stats.update(stat_dict["stats"])
-        # summary_stats.update(
-        #     calculate_summary_stats(stat_dict["array"], stat_dict["nodata"])
-        # )
         stats_list.append(summary_stats)
         LOGGER.info(f"done with {raster_path}")
 
