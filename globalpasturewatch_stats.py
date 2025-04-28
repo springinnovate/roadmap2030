@@ -209,11 +209,6 @@ def extract_raster_array_by_feature(
             out_band.FlushCache()
             out_ds = None
 
-        raster = None
-        vector = None
-        mask_ds = None
-        mem_ds = None
-        arr_masked = None
         running_stats = {
             # "array": arr_masked,
             "nodata": nodata,
@@ -221,6 +216,12 @@ def extract_raster_array_by_feature(
             "valid_pixel_area_ha": valid_pixel_area_ha,
         }
         running_stats["stats"] = calculate_summary_stats(arr_masked, nodata)
+
+        raster = None
+        vector = None
+        mask_ds = None
+        mem_ds = None
+        arr_masked = None
         return running_stats
     except Exception as e:
         return f"Failure on {raster_path}: {e}: \n{traceback.format_exc()}"
@@ -229,6 +230,7 @@ def extract_raster_array_by_feature(
 def calculate_summary_stats(array, nodata):
     """Calculate the min/max/std/mean/percentile over the non-nodata pixel in raster."""
     array = array[(array != nodata) & ~np.isnan(array)]
+
     if array.size == 0:
         # guard against a nodata array
         array = np.array([0.0])
