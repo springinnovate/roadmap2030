@@ -1,18 +1,15 @@
-import collections
-import csv
 import datetime
 import glob
 import logging
 import numpy as np
 import os
 import sys
+import traceback
 
-from ecoshard import geoprocessing
 from ecoshard import taskgraph
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
-import geopandas as gpd
 import pandas as pd
 
 logging.basicConfig(
@@ -87,134 +84,146 @@ def extract_raster_array_by_feature(
             the specified vector feature geometry. Pixels outside the feature
             geometry are assigned the raster's NoData value.
     """
-    raster = gdal.Open(raster_path, gdal.GA_ReadOnly)
-    gt = raster.GetGeoTransform()
-    inv_gt = gdal.InvGeoTransform(gt)
+    try:
+        raster = gdal.Open(raster_path, gdal.GA_ReadOnly)
+        gt = raster.GetGeoTransform()
+        inv_gt = gdal.InvGeoTransform(gt)
 
-    raster_projection = osr.SpatialReference()
-    raster_projection.ImportFromWkt(raster.GetProjection())
-    raster_projection.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+        raster_projection = osr.SpatialReference()
+        raster_projection.ImportFromWkt(raster.GetProjection())
+        raster_projection.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
 
-    vector = ogr.Open(vector_path)
-    layer = vector.GetLayer(0)
-    feature = layer.GetFeature(fid)
-    geometry = feature.GetGeometryRef().Clone()
-    if geometry.GetSpatialReference() is None:
-        geometry.AssignSpatialReference(layer.GetSpatialRef())
-    if not geometry.GetSpatialReference().IsSame(raster_projection):
-        geometry.TransformTo(raster_projection)
+        vector = ogr.Open(vector_path)
+        layer = vector.GetLayer(0)
+        feature = layer.GetFeature(fid)
+        geometry = feature.GetGeometryRef().Clone()
+        if geometry.GetSpatialReference() is None:
+            geometry.AssignSpatialReference(layer.GetSpatialRef())
+        if not geometry.GetSpatialReference().IsSame(raster_projection):
+            geometry.TransformTo(raster_projection)
 
-    minx, maxx, miny, maxy = geometry.GetEnvelope()
-    LOGGER.debug(f"gt: {inv_gt}, minx: {minx}, maxy: {maxy}")
-    payload = gdal.ApplyGeoTransform(inv_gt, minx, maxy)
-    LOGGER.debug(f"payload: {payload}")
-    px_min, py_max = gdal.ApplyGeoTransform(inv_gt, minx, maxy)
-    px_max, py_min = gdal.ApplyGeoTransform(inv_gt, maxx, miny)
+        minx, maxx, miny, maxy = geometry.GetEnvelope()
+        LOGGER.debug(f"gt: {inv_gt}, minx: {minx}, maxy: {maxy}")
+        payload = gdal.ApplyGeoTransform(inv_gt, minx, maxy)
+        LOGGER.debug(f"payload: {payload}")
+        px_min, py_max = gdal.ApplyGeoTransform(inv_gt, minx, maxy)
+        px_max, py_min = gdal.ApplyGeoTransform(inv_gt, maxx, miny)
 
-    xoff = int(np.floor(min(px_min, px_max)))
-    yoff = int(np.floor(min(py_min, py_max)))
-    xsize = int(np.ceil(abs(px_max - px_min)))
-    ysize = int(np.ceil(abs(py_max - py_min)))
-    xoff = max(0, xoff)
-    yoff = max(0, yoff)
-    xsize = min(xsize, raster.RasterXSize - xoff)
-    ysize = min(ysize, raster.RasterYSize - yoff)
+        xoff = int(np.floor(min(px_min, px_max)))
+        yoff = int(np.floor(min(py_min, py_max)))
+        xsize = int(np.ceil(abs(px_max - px_min)))
+        ysize = int(np.ceil(abs(py_max - py_min)))
+        xoff = max(0, xoff)
+        yoff = max(0, yoff)
+        xsize = min(xsize, raster.RasterXSize - xoff)
+        ysize = min(ysize, raster.RasterYSize - yoff)
 
-    LOGGER.debug(f"{xoff}, {yoff}, {xsize}, {ysize}")
+        LOGGER.debug(f"{xoff}, {yoff}, {xsize}, {ysize}")
 
-    band = raster.GetRasterBand(1)
-    arr = band.ReadAsArray(xoff, yoff, xsize, ysize)
-    nodata = (
-        band.GetNoDataValue() if band.GetNoDataValue() is not None else -9999
-    )
-
-    subset_gt = (
-        gt[0] + xoff * gt[1],
-        gt[1],
-        0.0,
-        gt[3] + yoff * gt[5],
-        0.0,
-        gt[5],
-    )
-
-    mem_drv = ogr.GetDriverByName("Memory")
-    mem_ds = mem_drv.CreateDataSource("")
-    mem_layer = mem_ds.CreateLayer(
-        "clip", raster_projection, geom_type=geometry.GetGeometryType()
-    )
-    mem_feature = ogr.Feature(mem_layer.GetLayerDefn())
-    mem_feature.SetGeometry(geometry)
-    mem_layer.CreateFeature(mem_feature)
-
-    mask_ds = gdal.GetDriverByName("MEM").Create(
-        "", xsize, ysize, 1, gdal.GDT_Byte
-    )
-    mask_ds.SetGeoTransform(subset_gt)
-    mask_ds.SetProjection(raster_projection.ExportToWkt())
-    gdal.RasterizeLayer(mask_ds, [1], mem_layer, burn_values=[1])
-    mask = mask_ds.ReadAsArray().astype(bool)
-
-    arr_masked = np.where(mask, arr, nodata)
-
-    # get equal area hectars
-    equal_area_sr = osr.SpatialReference()
-    equal_area_sr.ImportFromEPSG(6933)  # World Equal Area CRS
-    geom_equal_area = geometry.Clone()
-    geom_equal_area.TransformTo(equal_area_sr)
-    feature_area_m2 = geom_equal_area.GetArea()
-    feature_area_ha = feature_area_m2 / 10000.0
-
-    if raster_projection.IsGeographic():
-        # raster is geographic (degrees), so approximate pixel area via reprojection
-        LOGGER.info("it is in degrees so approximating via reprojection")
-        ul_x, ul_y = subset_gt[0], subset_gt[3]
-        lr_x = subset_gt[0] + xsize * subset_gt[1]
-        lr_y = subset_gt[3] + ysize * subset_gt[5]
-
-        ring = ogr.Geometry(ogr.wkbLinearRing)
-        ring.AddPoint(ul_x, ul_y)
-        ring.AddPoint(lr_x, ul_y)
-        ring.AddPoint(lr_x, lr_y)
-        ring.AddPoint(ul_x, lr_y)
-        ring.AddPoint(ul_x, ul_y)
-        bbox_geom = ogr.Geometry(ogr.wkbPolygon)
-        bbox_geom.AddGeometry(ring)
-        bbox_geom.AssignSpatialReference(raster_projection)
-        bbox_geom.TransformTo(equal_area_sr)
-        bbox_area_m2 = bbox_geom.GetArea()
-        pixel_area_m2 = bbox_area_m2 / (xsize * ysize)
-    else:
-        # raster projection in linear units (meters)
-        pixel_area_m2 = abs(gt[1] * gt[5])
-
-    # Valid Pixel Area (ha)
-    pixel_width, pixel_height = abs(gt[1]), abs(gt[5])
-    valid_pixel_count = np.count_nonzero((arr != nodata) & mask)
-    valid_pixel_area_ha = (valid_pixel_count * pixel_area_m2) / 10000.0
-
-    if output_tif:
-        drv = gdal.GetDriverByName("GTiff")
-        out_ds = drv.Create(
-            output_tif, xsize, ysize, 1, band.DataType, options=["COMPRESS=LZW"]
+        band = raster.GetRasterBand(1)
+        arr = band.ReadAsArray(xoff, yoff, xsize, ysize)
+        nodata = (
+            band.GetNoDataValue()
+            if band.GetNoDataValue() is not None
+            else -9999
         )
-        out_ds.SetGeoTransform(subset_gt)
-        out_ds.SetProjection(raster_projection.ExportToWkt())
-        out_band = out_ds.GetRasterBand(1)
-        out_band.WriteArray(arr_masked)
-        out_band.SetNoDataValue(nodata)
-        out_band.FlushCache()
-        out_ds = None
 
-    raster = None
-    vector = None
-    mask_ds = None
-    mem_ds = None
-    return {
-        "array": arr_masked,
-        "nodata": nodata,
-        "feature_area_ha": feature_area_ha,
-        "valid_pixel_area_ha": valid_pixel_area_ha,
-    }
+        subset_gt = (
+            gt[0] + xoff * gt[1],
+            gt[1],
+            0.0,
+            gt[3] + yoff * gt[5],
+            0.0,
+            gt[5],
+        )
+
+        mem_drv = ogr.GetDriverByName("Memory")
+        mem_ds = mem_drv.CreateDataSource("")
+        mem_layer = mem_ds.CreateLayer(
+            "clip", raster_projection, geom_type=geometry.GetGeometryType()
+        )
+        mem_feature = ogr.Feature(mem_layer.GetLayerDefn())
+        mem_feature.SetGeometry(geometry)
+        mem_layer.CreateFeature(mem_feature)
+
+        mask_ds = gdal.GetDriverByName("MEM").Create(
+            "", xsize, ysize, 1, gdal.GDT_Byte
+        )
+        mask_ds.SetGeoTransform(subset_gt)
+        mask_ds.SetProjection(raster_projection.ExportToWkt())
+        gdal.RasterizeLayer(mask_ds, [1], mem_layer, burn_values=[1])
+        mask = mask_ds.ReadAsArray().astype(bool)
+
+        arr_masked = np.where(mask, arr, nodata)
+
+        # get equal area hectars
+        equal_area_sr = osr.SpatialReference()
+        equal_area_sr.ImportFromEPSG(6933)  # World Equal Area CRS
+        geom_equal_area = geometry.Clone()
+        geom_equal_area.TransformTo(equal_area_sr)
+        feature_area_m2 = geom_equal_area.GetArea()
+        feature_area_ha = feature_area_m2 / 10000.0
+
+        if raster_projection.IsGeographic():
+            # raster is geographic (degrees), so approximate pixel area via reprojection
+            LOGGER.info("it is in degrees so approximating via reprojection")
+            ul_x, ul_y = subset_gt[0], subset_gt[3]
+            lr_x = subset_gt[0] + xsize * subset_gt[1]
+            lr_y = subset_gt[3] + ysize * subset_gt[5]
+
+            ring = ogr.Geometry(ogr.wkbLinearRing)
+            ring.AddPoint(ul_x, ul_y)
+            ring.AddPoint(lr_x, ul_y)
+            ring.AddPoint(lr_x, lr_y)
+            ring.AddPoint(ul_x, lr_y)
+            ring.AddPoint(ul_x, ul_y)
+            bbox_geom = ogr.Geometry(ogr.wkbPolygon)
+            bbox_geom.AddGeometry(ring)
+            bbox_geom.AssignSpatialReference(raster_projection)
+            bbox_geom.TransformTo(equal_area_sr)
+            bbox_area_m2 = bbox_geom.GetArea()
+            pixel_area_m2 = bbox_area_m2 / (xsize * ysize)
+        else:
+            # raster projection in linear units (meters)
+            pixel_area_m2 = abs(gt[1] * gt[5])
+
+        # Valid Pixel Area (ha)
+        valid_pixel_count = np.count_nonzero((arr != nodata) & mask)
+        valid_pixel_area_ha = (valid_pixel_count * pixel_area_m2) / 10000.0
+
+        if output_tif:
+            drv = gdal.GetDriverByName("GTiff")
+            out_ds = drv.Create(
+                output_tif,
+                xsize,
+                ysize,
+                1,
+                band.DataType,
+                options=["COMPRESS=LZW"],
+            )
+            out_ds.SetGeoTransform(subset_gt)
+            out_ds.SetProjection(raster_projection.ExportToWkt())
+            out_band = out_ds.GetRasterBand(1)
+            out_band.WriteArray(arr_masked)
+            out_band.SetNoDataValue(nodata)
+            out_band.FlushCache()
+            out_ds = None
+
+        raster = None
+        vector = None
+        mask_ds = None
+        mem_ds = None
+        arr_masked = None
+        running_stats = {
+            # "array": arr_masked,
+            "nodata": nodata,
+            "feature_area_ha": feature_area_ha,
+            "valid_pixel_area_ha": valid_pixel_area_ha,
+        }
+        running_stats["stats"] = calculate_summary_stats(arr_masked, nodata)
+        return running_stats
+    except Exception as e:
+        return f"Failure on {raster_path}: {e}: \n{traceback.format_exc()}"
 
 
 def calculate_summary_stats(array, nodata):
@@ -244,7 +253,7 @@ def main():
     """Entry point."""
     print(os.cpu_count())
     task_graph = taskgraph.TaskGraph(
-        OUTPUT_DIR, os.cpu_count() * 2, reporting_interval=15.0
+        OUTPUT_DIR, os.cpu_count(), reporting_interval=15.0
     )
 
     vector = gdal.OpenEx(AOI_PATH)
@@ -271,17 +280,22 @@ def main():
             payload_list.append(payload)
 
     stats_list = []
+    error_list = []
     for payload in payload_list:
         stat_dict = payload.get()
+        if isinstance(stat_dict, str):
+            error_list.append(stat_dict)
+            continue
         summary_stats = {
             "feature name": name,
             "raster name": os.path.splitext(os.path.basename(raster_path))[0],
             "feature_area_ha": stat_dict["feature_area_ha"],
             "valid_pixel_area_ha": stat_dict["valid_pixel_area_ha"],
         }
-        summary_stats.update(
-            calculate_summary_stats(stat_dict["array"], stat_dict["nodata"])
-        )
+        summary_stats.update(stat_dict["stats"])
+        # summary_stats.update(
+        #     calculate_summary_stats(stat_dict["array"], stat_dict["nodata"])
+        # )
         stats_list.append(summary_stats)
         LOGGER.info(f"done with {raster_path}")
 
@@ -292,6 +306,7 @@ def main():
     task_graph.close()
     task_graph.join()
     print(f"all done -- results in {output_filename}!")
+    print("these are the errors:\n" + "\n".join(error_list))
 
 
 if __name__ == "__main__":
