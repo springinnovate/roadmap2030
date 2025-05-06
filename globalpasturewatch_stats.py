@@ -293,7 +293,7 @@ def main():
                     func=extract_raster_array_by_feature,
                     args=((raster_path, band_index + 1), AOI_PATH, fid),
                     store_result=True,
-                    task_name=f"stats for {raster_path}",
+                    task_name=f"stats for {raster_path}/{band_description}",
                 )
                 task_list.append((raster_path, band_description, name, task))
 
