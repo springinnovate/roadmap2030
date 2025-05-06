@@ -38,7 +38,7 @@ AOI_PATH, AOI_NAME_KEY = (
 
 # Make a list here if you like
 RASTER_PATHS_TO_SUMMARIZE = glob.glob(
-    r"D:\repositories\data_platform\Nature\eii_soknot"
+    r"D:\repositories\data_platform\Nature\eii_soknot/*.tif"
 ) + glob.glob(r"Z:/data_platform/Nature/global_pasture_watch_rasters/*.tif")
 # r"Z:\data_platform\Nature\global_pasture_watch_rasters\gpw_gpp.daily.grass_lue.model_m_30m_s_20000101_20000228_go_epsg.4326_v1.tif"
 
