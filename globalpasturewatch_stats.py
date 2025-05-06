@@ -39,7 +39,7 @@ AOI_PATH, AOI_NAME_KEY = (
 # Make a list here if you like
 RASTER_PATHS_TO_SUMMARIZE = glob.glob(
     r"Z:/data_platform/Nature/global_pasture_watch_rasters/*.tif"
-)
+) + glob.glob(r"D:\repositories\data_platform\Nature\eii_soknot")
 # r"Z:\data_platform\Nature\global_pasture_watch_rasters\gpw_gpp.daily.grass_lue.model_m_30m_s_20000101_20000228_go_epsg.4326_v1.tif"
 
 
@@ -172,7 +172,7 @@ def extract_raster_array_by_feature(
 
         if raster_projection.IsGeographic():
             # raster is geographic (degrees), so approximate pixel area via reprojection
-            LOGGER.info("it is in degrees so approximating via reprojection")
+            # LOGGER.info("it is in degrees so approximating via reprojection")
             ul_x, ul_y = subset_gt[0], subset_gt[3]
             lr_x = subset_gt[0] + xsize * subset_gt[1]
             lr_y = subset_gt[3] + ysize * subset_gt[5]
@@ -291,7 +291,7 @@ def main():
                 LOGGER.debug(raster_path)
                 task = task_graph.add_task(
                     func=extract_raster_array_by_feature,
-                    args=(raster_path, AOI_PATH, fid),
+                    args=((raster_path, band_index + 1), AOI_PATH, fid),
                     store_result=True,
                     task_name=f"stats for {raster_path}",
                 )
