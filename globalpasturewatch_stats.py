@@ -8,6 +8,7 @@ import sys
 import traceback
 
 from ecoshard import taskgraph
+from ecoshard import geoprocessing
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
@@ -62,7 +63,7 @@ for dirpath in [OUTPUT_DIR, CLIPPED_DIR]:
 
 
 def extract_raster_array_by_feature(
-    raster_path, vector_path, fid, output_tif=None
+    raster_path_band, vector_path, fid, output_tif=None
 ):
     """Extracts and masks a raster subset array using a specified vector feature.
 
@@ -77,7 +78,7 @@ def extract_raster_array_by_feature(
     disk throughput.
 
     Args:
-        raster_path (str): Path to the raster dataset (GeoTIFF).
+        raster_path_band (tuple): (str, integer) path band tuple to analyze.
         vector_path (str): Path to the vector dataset (e.g., GeoPackage, Shapefile).
         fid (int): Feature ID of the target geometry in the first layer of the vector dataset.
         output_tif (str, optional): Path to output a GeoTIFF file of the clipped raster
@@ -89,6 +90,7 @@ def extract_raster_array_by_feature(
             geometry are assigned the raster's NoData value.
     """
     try:
+        raster_path, raster_band_id = raster_path_band
         raster = gdal.Open(raster_path, gdal.GA_ReadOnly)
         gt = raster.GetGeoTransform()
         inv_gt = gdal.InvGeoTransform(gt)
@@ -124,7 +126,7 @@ def extract_raster_array_by_feature(
 
         LOGGER.debug(f"{xoff}, {yoff}, {xsize}, {ysize}")
 
-        band = raster.GetRasterBand(1)
+        band = raster.GetRasterBand(raster_band_id)
         arr = band.ReadAsArray(xoff, yoff, xsize, ysize)
         nodata = (
             band.GetNoDataValue()
@@ -275,19 +277,29 @@ def main():
 
     task_list = []
     for raster_path in RASTER_PATHS_TO_SUMMARIZE:
-        for fid, name in fid_name_set:
-            LOGGER.debug(raster_path)
-            task = task_graph.add_task(
-                func=extract_raster_array_by_feature,
-                args=(raster_path, AOI_PATH, fid),
-                store_result=True,
-                task_name=f"stats for {raster_path}",
-            )
-            task_list.append((raster_path, name, task))
+        raster = gdal.OpenEx(raster_path)
+        raster_band_description_list = [
+            raster.GetRasterBand(band_index).GetDescription()
+            or f"band_{band_index}"
+            for band_index in range(1, raster.RasterCount + 1)
+        ]
+        raster = None
+        for band_index, band_description in enumerate(
+            raster_band_description_list
+        ):
+            for fid, name in fid_name_set:
+                LOGGER.debug(raster_path)
+                task = task_graph.add_task(
+                    func=extract_raster_array_by_feature,
+                    args=(raster_path, AOI_PATH, fid),
+                    store_result=True,
+                    task_name=f"stats for {raster_path}",
+                )
+                task_list.append((raster_path, band_description, name, task))
 
     stats_list = []
     error_list = []
-    for raster_path, name, task in task_list:
+    for raster_path, band_description, name, task in task_list:
         payload = task.get()
         if isinstance(payload, str):
             error_list.append(payload)
@@ -308,6 +320,7 @@ def main():
         summary_stats = {
             "feature name": name,
             "raster name": raster_name,
+            "band description": band_description,
             "year": year,
             "period": period,
             "feature_area_ha": stat_dict["feature_area_ha"],
