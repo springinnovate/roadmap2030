@@ -7,8 +7,8 @@ import os
 import sys
 import traceback
 
+import psutil
 from ecoshard import taskgraph
-from ecoshard import geoprocessing
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
@@ -37,11 +37,13 @@ AOI_PATH, AOI_NAME_KEY = (
 
 
 # Make a list here if you like
+# RASTER_PATHS_TO_SUMMARIZE = glob.glob(
+#    r"D:\repositories\data_platform\Nature\eii_soknot/*.tif"
+# ) + glob.glob(r"Z:/data_platform/Nature/global_pasture_watch_rasters/*.tif")
+# r"Z:\data_platform\Nature\global_pasture_watch_rasters\gpw_gpp.daily.grass_lue.model_m_30m_s_20000101_20000228_go_epsg.4326_v1.tif"
 RASTER_PATHS_TO_SUMMARIZE = glob.glob(
     r"D:\repositories\data_platform\Nature\eii_soknot/*.tif"
-) + glob.glob(r"Z:/data_platform/Nature/global_pasture_watch_rasters/*.tif")
-# r"Z:\data_platform\Nature\global_pasture_watch_rasters\gpw_gpp.daily.grass_lue.model_m_30m_s_20000101_20000228_go_epsg.4326_v1.tif"
-
+)
 
 PERCENTILES_LIST = [1, 5, 10, 25, 75, 90, 95, 99]
 
@@ -128,11 +130,7 @@ def extract_raster_array_by_feature(
 
         band = raster.GetRasterBand(raster_band_id)
         arr = band.ReadAsArray(xoff, yoff, xsize, ysize)
-        nodata = (
-            band.GetNoDataValue()
-            if band.GetNoDataValue() is not None
-            else -9999
-        )
+        nodata = band.GetNoDataValue() if band.GetNoDataValue() is not None else -9999
 
         subset_gt = (
             gt[0] + xoff * gt[1],
@@ -152,9 +150,7 @@ def extract_raster_array_by_feature(
         mem_feature.SetGeometry(geometry)
         mem_layer.CreateFeature(mem_feature)
 
-        mask_ds = gdal.GetDriverByName("MEM").Create(
-            "", xsize, ysize, 1, gdal.GDT_Byte
-        )
+        mask_ds = gdal.GetDriverByName("MEM").Create("", xsize, ysize, 1, gdal.GDT_Byte)
         mask_ds.SetGeoTransform(subset_gt)
         mask_ds.SetProjection(raster_projection.ExportToWkt())
         gdal.RasterizeLayer(mask_ds, [1], mem_layer, burn_values=[1])
@@ -261,16 +257,13 @@ def main():
     """Entry point."""
     print(os.cpu_count())
     task_graph = taskgraph.TaskGraph(
-        OUTPUT_DIR, os.cpu_count(), reporting_interval=15.0
+        OUTPUT_DIR, psutil.cpu_count(logical=False), reporting_interval=15.0
     )
 
     vector = gdal.OpenEx(AOI_PATH)
     layer = vector.GetLayer()
     fid_name_set = set(
-        [
-            (feature.GetFID(), feature.GetField(AOI_NAME_KEY))
-            for feature in layer
-        ]
+        [(feature.GetFID(), feature.GetField(AOI_NAME_KEY)) for feature in layer]
     )
     layer.ResetReading()
     LOGGER.debug(fid_name_set)
@@ -279,24 +272,20 @@ def main():
     for raster_path in RASTER_PATHS_TO_SUMMARIZE:
         raster = gdal.OpenEx(raster_path)
         raster_band_description_list = [
-            raster.GetRasterBand(band_index).GetDescription()
-            or f"band_{band_index}"
+            raster.GetRasterBand(band_index).GetDescription() or f"band_{band_index}"
             for band_index in range(1, raster.RasterCount + 1)
         ]
         raster = None
-        for band_index, band_description in enumerate(
-            raster_band_description_list
-        ):
+        for band_index, band_description in enumerate(raster_band_description_list):
             for fid, name in fid_name_set:
-                LOGGER.debug(raster_path)
                 task = task_graph.add_task(
                     func=extract_raster_array_by_feature,
                     args=((raster_path, band_index + 1), AOI_PATH, fid),
                     store_result=True,
-                    task_name=f"stats for {raster_path}/{band_description}",
+                    task_name=f"stats for {name} over {raster_path}/{band_description}",
                 )
                 task_list.append((raster_path, band_description, name, task))
-
+    LOGGER.info("**** ALL TASKS SCHEDULED")
     stats_list = []
     error_list = []
     for raster_path, band_description, name, task in task_list:
@@ -306,15 +295,18 @@ def main():
             continue
         stat_dict = payload
         raster_name = os.path.splitext(os.path.basename(raster_path))[0]
-        match = re.search(
-            r"_(\d{4})(\d{2})(\d{2})_(\d{4})(\d{2})(\d{2})_", raster_name
-        )
+        match = re.search(r"_(\d{4})(\d{2})(\d{2})_(\d{4})(\d{2})(\d{2})_", raster_name)
         year = "unknown"
         period = "unknown"
         if match:
-            year_start, month_start, day_start, year_end, month_end, day_end = (
-                match.groups()
-            )
+            (
+                year_start,
+                month_start,
+                day_start,
+                year_end,
+                month_end,
+                day_end,
+            ) = match.groups()
             year = year_start
             period = f"{month_start}-{day_start} -- {month_end}-{day_end}"
         summary_stats = {
@@ -328,7 +320,6 @@ def main():
         }
         summary_stats.update(stat_dict["stats"])
         stats_list.append(summary_stats)
-        LOGGER.info(f"done with {raster_path}")
 
     stats_df = pd.DataFrame(stats_list)
     timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
