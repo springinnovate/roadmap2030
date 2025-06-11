@@ -4,9 +4,11 @@ Run with docker container:
 docker run --rm -it -v .:/usr/local/esos_c_models -v "D:\repositories\dem_precondition":/usr/local/esos_c_models/dem_precondition therealspring/roadmap2030_executor:latest
 """
 
-import csv
 import collections
+import csv
 import datetime
+import glob
+import itertools
 import logging
 import os
 import sys
@@ -19,12 +21,12 @@ from shapely.geometry import box
 from shapely.ops import transform
 import fiona
 import geopandas as gpd
-import numpy
-import pandas as pd
+import numpy as np
 import pyproj
+import rasterio
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     stream=sys.stdout,
     format=(
         "%(asctime)s (%(relativeCreated)d) %(levelname)s %(name)s"
@@ -34,29 +36,63 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 logging.getLogger("PIL").setLevel(logging.ERROR)
-logging.getLogger("ecoshard.taskgraph").setLevel(logging.INFO)
+logging.getLogger("ecoshard").setLevel(logging.INFO)
 logging.getLogger("fiona").setLevel(logging.WARN)
 
-POPULATION_RASTERS = [
-    "./data/pop_rasters/landscan-global-2023.tif",
-]
 
 POP_PIXEL_SIZE = [0.008333333333333, -0.008333333333333]
 km_in_deg = POP_PIXEL_SIZE[0] * 1000 / 900  # because it's 900m so converting to 1km
 BUFFER_AMOUNTS_IN_PIXELS_M = [
-    (int(numpy.round(x * km_in_deg / POP_PIXEL_SIZE[0])), x * 1000) for x in range(0, 6)
+    (int(np.round(x * km_in_deg / POP_PIXEL_SIZE[0])), x * 1000) for x in range(0, 6)
 ]  # try buffer zones of 0-5km
 
 # This is relative because Docker will map a volume
 GLOBAL_SUBWATERSHEDS_VECTOR_PATH = "./dem_precondition/data/merged_lev06.shp"
 DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"
-ANALYSIS_AOIS = {
-    "C217_Bengo_Territorios": "./data/WWF-Int_Pilot/Colombia/Colombia/C217_Bengo_Territorios/C217_Bengo_Territorios.shp",
+
+AOI_DIRS = ["./data/WWF-Int_Pilot", "./data/WWF-US_Pilot"]
+
+ANALYSIS_AOIS = {}
+
+for aoi_dir in AOI_DIRS:
+    for ext in ["shp", "gpkg"]:
+        pattern = os.path.join(aoi_dir, "**", f"*.{ext}")
+        for file_path in glob.glob(pattern, recursive=True):
+            basename = os.path.splitext(os.path.basename(file_path))[0]
+            ANALYSIS_AOIS[basename] = file_path
+
+POPULATION_RASTERS = {
+    "landscan-global-2023": "./data/pop_rasters/landscan-global-2023.tif",
+}
+
+ES_RASTERS = {
+    "sed_export_tnc_ESA_2020-1992_change": "./data/ABUNCHASERVICES/sed_export_tnc_ESA_2020-1992_change_md5_0ab0cf.tif",
+    "n_export_tnc_2020-1992_change": "./data/ABUNCHASERVICES/n_export_tnc_2020-1992_change_val_md5_18a2b3.tif",
 }
 
 
 OUTPUT_DIR = "./workspace_downstream_es_analysis"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def fast_multiply_and_sum(raster_path_a, raster_path_b, target_raster_path):
+    with rasterio.open(raster_path_a) as src_a, rasterio.open(raster_path_b) as src_b:
+        data_a = src_a.read(1, masked=True)
+        data_b = src_b.read(1, masked=True)
+
+        # Replace nodata values with zero
+        data_a_filled = np.where(data_a.mask, 0, data_a.data).astype(float)
+        data_b_filled = np.where(data_b.mask, 0, data_b.data).astype(float)
+
+        multiplied_data = data_a_filled * data_b_filled
+
+        # Update metadata for output raster
+        profile = src_a.profile.copy()
+        profile.update(dtype="float32", nodata=0)
+
+        with rasterio.open(target_raster_path, "w", **profile) as dst:
+            dst.write(multiplied_data, 1)
+        return np.sum(multiplied_data)
 
 
 def calc_flow_dir(
@@ -143,7 +179,7 @@ def mask_by_nonzero_and_sum(
         [base_raster_path, mask_raster_path],
         aligned_raster_path_list,
         ["near"] * 2,
-        base_raster_info["pixel_size"],
+        mask_raster_info["pixel_size"],
         mask_raster_info["bounding_box"],
     )
 
@@ -159,12 +195,12 @@ def mask_by_nonzero_and_sum(
 
     array = gdal.OpenEx(target_masked_path).ReadAsArray()
     array = array[array != nodata]
-    return numpy.sum(array)
+    return np.sum(array)
 
 
 def create_circular_kernel(kernel_path, buffer_size_in_px):
     diameter = buffer_size_in_px * 2 + 1
-    kernel_array = numpy.zeros((diameter, diameter), dtype=numpy.float32)
+    kernel_array = np.zeros((diameter, diameter), dtype=np.float32)
     cx, cy = buffer_size_in_px, buffer_size_in_px
 
     for i in range(diameter):
@@ -177,13 +213,6 @@ def create_circular_kernel(kernel_path, buffer_size_in_px):
     out_raster.GetRasterBand(1).WriteArray(kernel_array)
     out_raster.FlushCache()
     out_raster = None
-
-
-import geopandas as gpd
-import fiona
-import pyproj
-from shapely.geometry import box
-from shapely.ops import transform
 
 
 def subset_subwatersheds(
@@ -267,6 +296,9 @@ def main():
     )
     file = open("log.txt", "w")
     clipped_dem_work_list = []
+
+    # prep for each analysis AOI, that means figuring out the downstream
+    # subwatersheds and clipping/routing the DEM to those
     for analysis_id, aoi_vector_path in ANALYSIS_AOIS.items():
         subset_subwatersheds_vector_path = None
 
@@ -308,11 +340,6 @@ def main():
             target_path_list=[subset_subwatersheds_vector_path],
             task_name=f"subset subwatersheds for {analysis_id}",
         )
-        task_graph.join()
-        LOGGER.debug(
-            f"all done with testing, look in {subset_subwatersheds_vector_path}"
-        )
-        return
         flow_dir_path = os.path.join(
             local_workspace_dir, f"{analysis_id}_mfd_flow_dir.tif"
         )
@@ -320,7 +347,7 @@ def main():
             func=calc_flow_dir,
             args=(
                 analysis_id,
-                dem_raster_path,
+                DEM_RASTER_PATH,
                 subset_subwatersheds_vector_path,
                 flow_dir_path,
             ),
@@ -341,6 +368,9 @@ def main():
                 ),
             )
         )
+
+    # now schedule work for all the population/es rasters given the aoi/dem
+    # clipping
     for analysis_id, (
         local_workspace_dir,
         flow_dir_path,
@@ -349,7 +379,7 @@ def main():
         flow_dir_task,
     ) in clipped_dem_work_list:
         clipped_dem_path = flow_dir_task.get()
-        print(analysis_id)
+        LOGGER.info(f"processing {analysis_id}")
         rasterize_task = task_graph.add_task(
             func=rasterize,
             args=(
@@ -375,19 +405,22 @@ def main():
             task_name=f"flow accum for {analysis_id}",
         )
 
+        # buffer out the population and ES downstream data to a mask
         for buffer_size_in_px, buffer_size_in_m in BUFFER_AMOUNTS_IN_PIXELS_M:
             if buffer_size_in_px > 0:
                 buffered_downstream_flow_mask_path = (
                     f"%s_{buffer_size_in_m}m%s"
                     % os.path.splitext(aoi_downstream_flow_mask_path)
                 )
-                # make a kernel raster that is a circle kernel that's all 1s within buffer_size_in_px from the center
-                # dimensions should be buffer_size_in_px*2+1 X buffer_size_in_px*2+1
-                # no projection is necessary
+                # make a kernel raster that is a circle kernel that's all 1s
+                # within buffer_size_in_px from the center
+                # dimensions should be
+                #    buffer_size_in_px*2+1 X buffer_size_in_px*2+1
                 kernel_path = os.path.join(
                     local_workspace_dir, f"kernel_{buffer_size_in_m}.tif"
                 )
                 convolve_dependent_task_list = [flow_accum_task]
+                # this `if` avoids double scheduling of the same task
                 if kernel_path not in kernel_task_map:
                     kernel_task = task_graph.add_task(
                         func=create_circular_kernel,
@@ -416,52 +449,137 @@ def main():
                 buffered_downstream_flow_mask_path = aoi_downstream_flow_mask_path
                 mask_by_nonzero_and_sum_dependent_task_list = [flow_accum_task]
 
-            for population_raster_path in POPULATION_RASTERS:
-                pop_basename = os.path.splitext(
-                    os.path.basename(population_raster_path)
-                )[0]
-                print(f"processing {pop_basename} for {buffer_size_in_m}m buffer")
-                masked_population_raster_path = os.path.join(
+            # then for each pop and ES raster, buffer that out and sum
+            for raster_id, raster_path in {
+                **POPULATION_RASTERS,
+                **ES_RASTERS,
+            }.items():
+                print(f"processing {raster_id} for {buffer_size_in_m}m buffer")
+                masked_raster_path = os.path.join(
                     local_workspace_dir,
-                    f"{analysis_id}_{buffer_size_in_m}m_{os.path.basename(population_raster_path)}",
+                    f"{analysis_id}_{buffer_size_in_m}m_{raster_id}.tif",
                 )
                 mask_by_nonzero_task = task_graph.add_task(
                     func=mask_by_nonzero_and_sum,
                     args=(
-                        f"{analysis_id}_{pop_basename}_{buffer_size_in_m}",
-                        population_raster_path,
+                        f"{analysis_id}_{raster_id}_{buffer_size_in_m}",
+                        raster_path,
                         buffered_downstream_flow_mask_path,
-                        masked_population_raster_path,
+                        masked_raster_path,
                     ),
                     dependent_task_list=mask_by_nonzero_and_sum_dependent_task_list,
-                    target_path_list=[masked_population_raster_path],
+                    target_path_list=[masked_raster_path],
                     store_result=True,
                     task_name=f"{analysis_id}_population mask",
                 )
                 file.write(
-                    f"{analysis_id}_{pop_basename}, {population_raster_path}, {buffered_downstream_flow_mask_path}, {masked_population_raster_path}\n"
+                    f"{analysis_id}_{raster_id}, {raster_path}, {buffered_downstream_flow_mask_path}, {masked_raster_path}\n"
                 )
 
-                result[analysis_id][pop_basename][
-                    buffer_size_in_m
-                ] = mask_by_nonzero_task
+                result[analysis_id][raster_id][buffer_size_in_m] = {
+                    "task": mask_by_nonzero_task,
+                    "target_raster_path": masked_raster_path,
+                }
 
     for analysis_id in result:
-        for pop_basename in result[analysis_id]:
-            for buffer_size_in_m in result[analysis_id][pop_basename]:
-                result[analysis_id][pop_basename][buffer_size_in_m] = result[
-                    analysis_id
-                ][pop_basename][buffer_size_in_m].get()
+        for pop_raster_id, es_raster_id in itertools.product(
+            POPULATION_RASTERS, ES_RASTERS
+        ):
+            for buffer_size_in_m in result[analysis_id][pop_raster_id]:
+                pop_mask_task = result[analysis_id][pop_raster_id][buffer_size_in_m][
+                    "task"
+                ]
+                pop_mask_raster_path = result[analysis_id][pop_raster_id][
+                    buffer_size_in_m
+                ]["target_raster_path"]
+                es_mask_task = result[analysis_id][es_raster_id][buffer_size_in_m][
+                    "task"
+                ]
+                es_mask_raster_path = result[analysis_id][es_raster_id][
+                    buffer_size_in_m
+                ]["target_raster_path"]
+                dbsi_raster_path = os.path.join(
+                    local_workspace_dir,
+                    f"{analysis_id}_{pop_raster_id}_{es_raster_id}_"
+                    f"{buffer_size_in_m}m_dbsi.tif",
+                )
+                dbsi_task = task_graph.add_task(
+                    func=fast_multiply_and_sum,
+                    args=(
+                        pop_mask_raster_path,
+                        es_mask_raster_path,
+                        dbsi_raster_path,
+                    ),
+                    target_path_list=[dbsi_raster_path],
+                    dependent_task_list=[pop_mask_task, es_mask_task],
+                    store_result=True,
+                    task_name=(
+                        f"calc dbsi for {analysis_id}-{pop_raster_id}-"
+                        f"{es_raster_id}-{buffer_size_in_m}m"
+                    ),
+                )
+                result[analysis_id][f"{pop_raster_id}-{es_raster_id}"][
+                    buffer_size_in_m
+                ] = {"task": dbsi_task, "target_raster_path": dbsi_raster_path}
 
     timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    output_filename = os.path.join(OUTPUT_DIR, f"pop_results_{timestamp}.csv")
+    output_filename = os.path.join(OUTPUT_DIR, f"analysis_results_{timestamp}.csv")
+
     with open(output_filename, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["analysis_id", "pop_basename", "buffer in m", "value"])
+        writer.writerow(
+            [
+                "analysis_id",
+                "pop_raster_id",
+                "es_raster_id",
+                "buffer_m",
+                "pop_sum",
+                "es_sum",
+                "dpsi_sum",
+                "pop_path",
+                "es_path",
+                "dpsi_path",
+            ]
+        )
+
         for analysis_id in result:
-            for pop_basename, buffer_val_dict in result[analysis_id].items():
-                for buffer, val in buffer_val_dict.items():
-                    writer.writerow([analysis_id, pop_basename, buffer, val])
+            for pop_raster_id, es_raster_id in itertools.product(
+                POPULATION_RASTERS, ES_RASTERS
+            ):
+                for buffer_size_in_m in result[analysis_id][pop_raster_id]:
+                    pop_sum = result[analysis_id][pop_raster_id][buffer_size_in_m][
+                        "task"
+                    ].get()
+                    es_sum = result[analysis_id][es_raster_id][buffer_size_in_m][
+                        "task"
+                    ].get()
+                    dpsi_sum = result[analysis_id][f"{pop_raster_id}-{es_raster_id}"][
+                        buffer_size_in_m
+                    ]["task"].get()
+                    pop_path = result[analysis_id][pop_raster_id][buffer_size_in_m][
+                        "target_raster_path"
+                    ]
+                    es_path = result[analysis_id][es_raster_id][buffer_size_in_m][
+                        "target_raster_path"
+                    ]
+                    dpsi_path = result[analysis_id][f"{pop_raster_id}-{es_raster_id}"][
+                        buffer_size_in_m
+                    ]["target_raster_path"]
+                    writer.writerow(
+                        [
+                            analysis_id,
+                            pop_raster_id,
+                            es_raster_id,
+                            buffer_size_in_m,
+                            pop_sum,
+                            es_sum,
+                            dpsi_sum,
+                            pop_path,
+                            es_path,
+                            dpsi_path,
+                        ]
+                    )
+
     task_graph.join()
     task_graph.close()
     LOGGER.info(f"all done results at {output_filename}")
