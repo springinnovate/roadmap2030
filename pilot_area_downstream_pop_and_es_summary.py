@@ -50,14 +50,16 @@ logging.getLogger("fiona").setLevel(logging.WARN)
 POP_PIXEL_SIZE = [0.008333333333333, -0.008333333333333]
 km_in_deg = POP_PIXEL_SIZE[0] * 1000 / 900  # because it's 900m so converting to 1km
 BUFFER_AMOUNTS_IN_PIXELS_M = [
-    (int(np.round(x * km_in_deg / POP_PIXEL_SIZE[0])), x * 1000) for x in range(0, 6)
-]  # try buffer zones of 0-5km
+    (int(np.round(x * km_in_deg / POP_PIXEL_SIZE[0])), x * 1000) for x in range(0, 1)
+]
 
 # This is relative because Docker will map a volume
 GLOBAL_SUBWATERSHEDS_VECTOR_PATH = "./dem_precondition/data/merged_lev06.shp"
 DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"
 
-AOI_DIRS = ["./data/WWF-Int_Pilot", "./data/WWF-US_Pilot"]
+AOI_DIRS = [
+    "./data/WWF-Int_Pilot",
+]
 
 ANALYSIS_AOIS = {}
 BAD_AOIS = {}
@@ -449,24 +451,26 @@ def clean_it(filename, max_length=250):
     return os.path.join(dirname, sanitized_basename)
 
 
-def fast_multiply_and_sum(raster_path_a, raster_path_b, target_raster_path):
-    with rasterio.open(raster_path_a) as src_a, rasterio.open(raster_path_b) as src_b:
-        data_a = src_a.read(1, masked=True)
-        data_b = src_b.read(1, masked=True)
+def compute_net_and_directional_sums(
+    direction_raster_path, magnitude_raster_path, target_raster_path
+):
+    with rasterio.open(direction_raster_path) as raster_direction, rasterio.open(
+        magnitude_raster_path
+    ) as magnitude_raster:
+        dir_data = raster_direction.read(1, masked=True).filled(0).astype(float)
+        mag_data = magnitude_raster.read(1, masked=True).filled(0).astype(float)
 
-        # Replace nodata values with zero
-        data_a_filled = np.where(data_a.mask, 0, data_a.data).astype(float)
-        data_b_filled = np.where(data_b.mask, 0, data_b.data).astype(float)
+        net_effect = dir_data * mag_data
+        positive_effect_sum = np.sum(mag_data[dir_data > 0])
+        negative_effect_sum = np.sum(mag_data[dir_data < 0])
 
-        multiplied_data = data_a_filled * data_b_filled
-
-        # Update metadata for output raster
-        profile = src_a.profile.copy()
+        profile = raster_direction.profile.copy()
         profile.update(dtype="float32", nodata=0)
 
         with rasterio.open(target_raster_path, "w", **profile) as dst:
-            dst.write(multiplied_data, 1)
-        return np.sum(multiplied_data)
+            dst.write(net_effect.astype("float32"), 1)
+
+        return np.sum(net_effect), positive_effect_sum, negative_effect_sum
 
 
 def calc_flow_dir(
@@ -946,10 +950,10 @@ def main():
                     )
                 )
                 dbsi_task = task_graph.add_task(
-                    func=fast_multiply_and_sum,
+                    func=compute_net_and_directional_sums,
                     args=(
-                        pop_mask_raster_path,
                         es_mask_raster_path,
+                        pop_mask_raster_path,
                         dbsi_raster_path,
                     ),
                     target_path_list=[dbsi_raster_path],
@@ -980,6 +984,8 @@ def main():
                 "pop_sum",
                 "es_sum",
                 "dpsi_sum",
+                "dpsi_positive_pop",
+                "dpsi_negative_pop",
                 "pop_path",
                 "es_path",
                 "dpsi_path",
@@ -997,9 +1003,9 @@ def main():
                     es_sum = result[analysis_id][es_raster_id][buffer_size_in_m][
                         "task"
                     ].get()
-                    dpsi_sum = result[analysis_id][f"{pop_raster_id}-{es_raster_id}"][
-                        buffer_size_in_m
-                    ]["task"].get()
+                    (dpsi_sum, dpsi_positive_pop, dpsi_negative_pop) = result[
+                        analysis_id
+                    ][f"{pop_raster_id}-{es_raster_id}"][buffer_size_in_m]["task"].get()
                     pop_path = result[analysis_id][pop_raster_id][buffer_size_in_m][
                         "target_raster_path"
                     ]
@@ -1018,6 +1024,8 @@ def main():
                             pop_sum,
                             es_sum,
                             dpsi_sum,
+                            dpsi_positive_pop,
+                            dpsi_negative_pop,
                             pop_path,
                             es_path,
                             dpsi_path,
