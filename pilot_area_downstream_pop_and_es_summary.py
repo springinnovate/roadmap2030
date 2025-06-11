@@ -470,7 +470,11 @@ def compute_net_and_directional_sums(
         with rasterio.open(target_raster_path, "w", **profile) as dst:
             dst.write(net_effect.astype("float32"), 1)
 
-        return np.sum(net_effect), positive_effect_sum, negative_effect_sum
+        return {
+            "sum": np.sum(net_effect),
+            "pos_effect": positive_effect_sum,
+            "neg_effect": negative_effect_sum,
+        }
 
 
 def calc_flow_dir(
@@ -1003,9 +1007,12 @@ def main():
                     es_sum = result[analysis_id][es_raster_id][buffer_size_in_m][
                         "task"
                     ].get()
-                    (dpsi_sum, dpsi_positive_pop, dpsi_negative_pop) = result[
-                        analysis_id
-                    ][f"{pop_raster_id}-{es_raster_id}"][buffer_size_in_m]["task"].get()
+                    results_dict = result[analysis_id][
+                        f"{pop_raster_id}-{es_raster_id}"
+                    ][buffer_size_in_m]["task"].get()
+                    (dpsi_sum, dpsi_positive_pop, dpsi_negative_pop) = [
+                        results_dict[key] for key in ["sum", "pos_effect", "neg_effect"]
+                    ]
                     pop_path = result[analysis_id][pop_raster_id][buffer_size_in_m][
                         "target_raster_path"
                     ]
