@@ -8,16 +8,23 @@ import collections
 import csv
 import datetime
 import glob
+import hashlib
 import itertools
 import logging
 import os
 import sys
+import tempfile
 
+from ecoshard.geoprocessing.geoprocessing_core import (
+    DEFAULT_GTIFF_CREATION_TUPLE_OPTIONS,
+    DEFAULT_OSR_AXIS_MAPPING_STRATEGY,
+)
 from ecoshard import geoprocessing
 from ecoshard import taskgraph
 from ecoshard.geoprocessing import routing
 from osgeo import gdal
 from shapely.geometry import box
+from shapely.geometry import shape
 from shapely.ops import transform
 import fiona
 import geopandas as gpd
@@ -36,7 +43,7 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 logging.getLogger("PIL").setLevel(logging.ERROR)
-logging.getLogger("ecoshard").setLevel(logging.INFO)
+logging.getLogger("ecoshard").setLevel(logging.WARNING)
 logging.getLogger("fiona").setLevel(logging.WARN)
 
 
@@ -61,24 +68,21 @@ for aoi_dir in AOI_DIRS:
         for file_path in glob.glob(pattern, recursive=True):
             basename = os.path.splitext(os.path.basename(file_path))[0]
             try:
-                ds = gdal.OpenEx(file_path, gdal.OF_VECTOR)
-                if ds is None:
-                    raise ValueError("Invalid dataset")
+                with fiona.open(file_path, "r") as src:
+                    if len(src) == 0:
+                        raise ValueError("No features found")
 
-                layer = ds.GetLayer()
-                if layer is None or layer.GetFeatureCount() == 0:
-                    raise ValueError("Dataset has no valid layer or features")
+                    valid_geometry_found = False
+                    for feature in src:
+                        geom = feature["geometry"]
+                        if geom and geom != {}:
+                            shapely_geom = shape(geom)
+                            if not shapely_geom.is_empty:
+                                valid_geometry_found = True
+                                break
 
-                # Check if features have valid geometry
-                has_geometry = False
-                for feature in layer:
-                    geom = feature.GetGeometryRef()
-                    if geom is not None and not geom.IsEmpty():
-                        has_geometry = True
-                        break
-
-                if not has_geometry:
-                    raise ValueError("No valid geometry found in features")
+                    if not valid_geometry_found:
+                        raise ValueError("No valid geometry found in features")
 
                 ANALYSIS_AOIS[basename] = file_path
             except Exception:
@@ -96,6 +100,353 @@ ES_RASTERS = {
 
 OUTPUT_DIR = "./workspace_downstream_es_analysis"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def align_and_resize_raster_stack(
+    base_raster_path_list,
+    target_raster_path_list,
+    resample_method_list,
+    target_pixel_size,
+    bounding_box_mode,
+    base_vector_path_list=None,
+    raster_align_index=None,
+    base_projection_wkt_list=None,
+    target_projection_wkt=None,
+    vector_mask_options=None,
+    gdal_warp_options=None,
+    raster_driver_creation_tuple=DEFAULT_GTIFF_CREATION_TUPLE_OPTIONS,
+    osr_axis_mapping_strategy=DEFAULT_OSR_AXIS_MAPPING_STRATEGY,
+):
+    """Generate rasters from a base such that they align geospatially.
+
+    This function resizes base rasters that are in the same geospatial
+    projection such that the result is an aligned stack of rasters that have
+    the same cell size, dimensions, and bounding box. This is achieved by
+    clipping or resizing the rasters to intersected, unioned, or equivocated
+    bounding boxes of all the raster and vector input.
+
+    Args:
+        base_raster_path_list (sequence): a sequence of base raster paths that
+            will be transformed and will be used to determine the target
+            bounding box.
+        target_raster_path_list (sequence): a sequence of raster paths that
+            will be created to one-to-one map with ``base_raster_path_list``
+            as aligned versions of those original rasters. If there are
+            duplicate paths in this list, the function will raise a ValueError.
+        resample_method_list (sequence): a sequence of resampling methods
+            which one to one map each path in ``base_raster_path_list`` during
+            resizing.  Each element must be one of
+            "near|bilinear|cubic|cubicspline|lanczos|mode".
+        target_pixel_size (list/tuple): the target raster's x and y pixel size
+            example: (30, -30).
+        bounding_box_mode (string): one of "union", "intersection", or
+            a sequence of floats of the form [minx, miny, maxx, maxy] in the
+            target projection coordinate system.  Depending
+            on the value, output extents are defined as the union,
+            intersection, or the explicit bounding box.
+        base_vector_path_list (sequence): a sequence of base vector paths
+            whose bounding boxes will be used to determine the final bounding
+            box of the raster stack if mode is 'union' or 'intersection'.  If
+            mode is 'bb=[...]' then these vectors are not used in any
+            calculation.
+        raster_align_index (int): indicates the index of a
+            raster in ``base_raster_path_list`` that the target rasters'
+            bounding boxes pixels should align with.  This feature allows
+            rasters whose raster dimensions are the same, but bounding boxes
+            slightly shifted less than a pixel size to align with a desired
+            grid layout.  If ``None`` then the bounding box of the target
+            rasters is calculated as the precise intersection, union, or
+            bounding box.
+        base_projection_wkt_list (sequence): if not None, this is a sequence of
+            base projections of the rasters in ``base_raster_path_list``. If a
+            value is ``None`` the ``base_sr`` is assumed to be whatever is
+            defined in that raster. This value is useful if there are rasters
+            with no projection defined, but otherwise known.
+        target_projection_wkt (string): if not None, this is the desired
+            projection of all target rasters in Well Known Text format. If
+            None, the base SRS will be passed to the target.
+        vector_mask_options (dict): optional, if not None, this is a
+            dictionary of options to use an existing vector's geometry to
+            mask out pixels in the target raster that do not overlap the
+            vector's geometry. Keys to this dictionary are:
+
+            * ``'mask_vector_path'`` (str): path to the mask vector file.
+              This vector will be automatically projected to the target
+              projection if its base coordinate system does not match the
+              target.
+            * ``'mask_layer_name'`` (str): the layer name to use for masking.
+              If this key is not in the dictionary the default is to use
+              the layer at index 0.
+            * ``'mask_vector_where_filter'`` (str): an SQL WHERE string.
+              This will be used to filter the geometry in the mask. Ex: ``'id
+              > 10'`` would use all features whose field value of 'id' is >
+              10.
+
+        gdal_warp_options (sequence): if present, the contents of this list
+            are passed to the ``warpOptions`` parameter of ``gdal.Warp``. See
+            the `GDAL Warp documentation
+            <https://gdal.org/api/gdalwarp_cpp.html#_CPPv415GDALWarpOptions>`_
+            for valid options.
+        raster_driver_creation_tuple (tuple): a tuple containing a GDAL driver
+            name string as the first element and a GDAL creation options
+            tuple/list as the second. Defaults to a GTiff driver tuple
+            defined at geoprocessing.DEFAULT_GTIFF_CREATION_TUPLE_OPTIONS.
+        osr_axis_mapping_strategy (int): OSR axis mapping strategy for
+            ``SpatialReference`` objects. Defaults to
+            ``geoprocessing.DEFAULT_OSR_AXIS_MAPPING_STRATEGY``. This parameter
+            should not be changed unless you know what you are doing.
+
+    Return:
+        None
+
+    Raises:
+        ValueError
+            If any combination of the raw bounding boxes, raster
+            bounding boxes, vector bounding boxes, and/or vector_mask
+            bounding box does not overlap to produce a valid target.
+        ValueError
+            If any of the input or target lists are of different
+            lengths.
+        ValueError
+            If there are duplicate paths on the target list which would
+            risk corrupted output.
+        ValueError
+            If some combination of base, target, and embedded source
+            reference systems results in an ambiguous target coordinate
+            system.
+        ValueError
+            If ``vector_mask_options`` is not None but the
+            ``mask_vector_path`` is undefined or doesn't point to a valid
+            file.
+        ValueError
+            If ``pixel_size`` is not a 2 element sequence of numbers.
+
+    """
+    # make sure that the input lists are of the same length
+    list_lengths = [
+        len(base_raster_path_list),
+        len(target_raster_path_list),
+        len(resample_method_list),
+    ]
+    if len(set(list_lengths)) != 1:
+        raise ValueError(
+            "base_raster_path_list, target_raster_path_list, and "
+            "resample_method_list must be the same length "
+            " current lengths are %s" % (str(list_lengths))
+        )
+
+    unique_targets = set(target_raster_path_list)
+    if len(unique_targets) != len(target_raster_path_list):
+        seen = set()
+        duplicate_list = []
+        for path in target_raster_path_list:
+            if path not in seen:
+                seen.add(path)
+            else:
+                duplicate_list.append(path)
+        raise ValueError(
+            "There are duplicated paths on the target list. This is an "
+            "invalid state of ``target_path_list``. Duplicates: %s" % (duplicate_list)
+        )
+
+    # we can accept 'union', 'intersection', or a 4 element list/tuple
+    if bounding_box_mode not in ["union", "intersection"] and (
+        not isinstance(bounding_box_mode, (list, tuple)) or len(bounding_box_mode) != 4
+    ):
+        raise ValueError("Unknown bounding_box_mode %s" % (str(bounding_box_mode)))
+
+    n_rasters = len(base_raster_path_list)
+    if (raster_align_index is not None) and (
+        (raster_align_index < 0) or (raster_align_index >= n_rasters)
+    ):
+        raise ValueError(
+            "Alignment index is out of bounds of the datasets index: %s"
+            " n_elements %s" % (raster_align_index, n_rasters)
+        )
+
+    # used to get bounding box, projection, and possible alignment info
+    raster_info_list = [
+        geoprocessing.get_raster_info(path) for path in base_raster_path_list
+    ]
+
+    # get the literal or intersecting/unioned bounding box
+    if isinstance(bounding_box_mode, (list, tuple)):
+        # if it's a sequence or tuple, it must be a manual bounding box
+        LOGGER.debug("assuming manual bounding box mode of %s", bounding_box_mode)
+        target_bounding_box = bounding_box_mode
+    else:
+        # either intersection or union, get list of bounding boxes, reproject
+        # if necessary, and reduce to a single box
+        if base_vector_path_list is not None:
+            # vectors are only interesting for their bounding boxes, that's
+            # this construction is inside an else.
+            vector_info_list = [
+                geoprocessing.get_vector_info(path) for path in base_vector_path_list
+            ]
+        else:
+            vector_info_list = []
+
+        raster_bounding_box_list = []
+        for raster_index, raster_info in enumerate(raster_info_list):
+            # this block calculates the base projection of ``raster_info`` if
+            # ``target_projection_wkt`` is defined, thus implying a
+            # reprojection will be necessary.
+            if target_projection_wkt:
+                if base_projection_wkt_list and base_projection_wkt_list[raster_index]:
+                    # a base is defined, use that
+                    base_raster_projection_wkt = base_projection_wkt_list[raster_index]
+                else:
+                    # otherwise use the raster's projection and there must
+                    # be one since we're reprojecting
+                    base_raster_projection_wkt = raster_info["projection_wkt"]
+                    if not base_raster_projection_wkt:
+                        raise ValueError(
+                            "no projection for raster %s"
+                            % base_raster_path_list[raster_index]
+                        )
+                # since the base spatial reference is potentially different
+                # than the target, we need to transform the base bounding
+                # box into target coordinates so later we can calculate
+                # accurate bounding box overlaps in the target coordinate
+                # system
+                raster_bounding_box_list.append(
+                    geoprocessing.transform_bounding_box(
+                        raster_info["bounding_box"],
+                        base_raster_projection_wkt,
+                        target_projection_wkt,
+                    )
+                )
+            else:
+                raster_bounding_box_list.append(raster_info["bounding_box"])
+
+        # include the vector bounding box information to make a global list
+        # of target bounding boxes
+        bounding_box_list = [
+            (
+                vector_info["bounding_box"]
+                if target_projection_wkt is None
+                else geoprocessing.transform_bounding_box(
+                    vector_info["bounding_box"],
+                    vector_info["projection_wkt"],
+                    target_projection_wkt,
+                )
+            )
+            for vector_info in vector_info_list
+        ] + raster_bounding_box_list
+
+        target_bounding_box = geoprocessing.merge_bounding_box_list(
+            bounding_box_list, bounding_box_mode
+        )
+
+    if vector_mask_options:
+        # ensure the mask exists and intersects with the target bounding box
+        if "mask_vector_path" not in vector_mask_options:
+            raise ValueError(
+                "vector_mask_options passed, but no value for "
+                '"mask_vector_path": %s',
+                vector_mask_options,
+            )
+
+        mask_vector_info = geoprocessing.get_vector_info(
+            vector_mask_options["mask_vector_path"]
+        )
+
+        if "mask_vector_where_filter" in vector_mask_options:
+            # the bounding box only exists for the filtered features
+            mask_vector = gdal.OpenEx(
+                vector_mask_options["mask_vector_path"], gdal.OF_VECTOR
+            )
+            mask_layer = mask_vector.GetLayer()
+            mask_layer.SetAttributeFilter(
+                vector_mask_options["mask_vector_where_filter"]
+            )
+            mask_bounding_box = geoprocessing.merge_bounding_box_list(
+                [
+                    [feature.GetGeometryRef().GetEnvelope()[i] for i in [0, 2, 1, 3]]
+                    for feature in mask_layer
+                ],
+                "union",
+            )
+            mask_layer = None
+            mask_vector = None
+        else:
+            # if no where filter then use the raw vector bounding box
+            mask_bounding_box = mask_vector_info["bounding_box"]
+
+        mask_vector_projection_wkt = mask_vector_info["projection_wkt"]
+        if mask_vector_projection_wkt is not None and target_projection_wkt is not None:
+            mask_vector_bb = geoprocessing.transform_bounding_box(
+                mask_bounding_box,
+                mask_vector_info["projection_wkt"],
+                target_projection_wkt,
+            )
+        else:
+            mask_vector_bb = mask_vector_info["bounding_box"]
+        # Calling `merge_bounding_box_list` will raise an ValueError if the
+        # bounding box of the mask and the target do not intersect. The
+        # result is otherwise not used.
+        _ = geoprocessing.merge_bounding_box_list(
+            [target_bounding_box, mask_vector_bb], "intersection"
+        )
+
+    if raster_align_index is not None and raster_align_index >= 0:
+        # bounding box needs alignment
+        align_bounding_box = raster_info_list[raster_align_index]["bounding_box"]
+        align_pixel_size = raster_info_list[raster_align_index]["pixel_size"]
+        # adjust bounding box so lower left corner aligns with a pixel in
+        # raster[raster_align_index]
+        for index in [0, 1]:
+            n_pixels = int(
+                (target_bounding_box[index] - align_bounding_box[index])
+                / float(align_pixel_size[index])
+            )
+            target_bounding_box[index] = (
+                n_pixels * align_pixel_size[index] + align_bounding_box[index]
+            )
+
+    for index, (base_path, target_path, resample_method) in enumerate(
+        zip(base_raster_path_list, target_raster_path_list, resample_method_list)
+    ):
+        geoprocessing.warp_raster(
+            base_path,
+            target_pixel_size,
+            target_path,
+            resample_method,
+            **{
+                "target_bb": target_bounding_box,
+                "raster_driver_creation_tuple": (raster_driver_creation_tuple),
+                "target_projection_wkt": target_projection_wkt,
+                "base_projection_wkt": (
+                    None
+                    if not base_projection_wkt_list
+                    else base_projection_wkt_list[index]
+                ),
+                "vector_mask_options": vector_mask_options,
+                "gdal_warp_options": gdal_warp_options,
+            },
+        )
+        LOGGER.info(
+            "%d of %d aligned: %s",
+            index + 1,
+            n_rasters,
+            os.path.basename(target_path),
+        )
+
+    LOGGER.info("aligned all %d rasters.", n_rasters)
+
+
+def clean_it(filename, max_length=250):
+    dirname, basename = os.path.split(filename)
+    name, ext = os.path.splitext(basename)
+
+    if len(dirname) + len(basename) <= max_length:
+        return filename
+
+    hash_digest = hashlib.md5(basename.encode("utf-8")).hexdigest()
+    shortened_name = name[: max_length - len(hash_digest) - len(ext) - 1]
+    sanitized_basename = f"{shortened_name}_{hash_digest}{ext}"
+
+    return os.path.join(dirname, sanitized_basename)
 
 
 def fast_multiply_and_sum(raster_path_a, raster_path_b, target_raster_path):
@@ -119,11 +470,14 @@ def fast_multiply_and_sum(raster_path_a, raster_path_b, target_raster_path):
 
 
 def calc_flow_dir(
-    analysis_id, base_dem_raster_path, aoi_vector_path, target_flow_dir_path
+    analysis_id,
+    base_dem_raster_path,
+    aoi_vector_path,
+    target_clipped_dem_path,
+    target_flow_dir_path,
 ):
     local_workspace_dir = os.path.dirname(target_flow_dir_path)
     os.makedirs(local_workspace_dir, exist_ok=True)
-    clipped_dem_path = os.path.join(local_workspace_dir, f"{analysis_id}_dem.tif")
     dem_info = geoprocessing.get_raster_info(base_dem_raster_path)
     aoi_ds = gdal.OpenEx(aoi_vector_path, gdal.OF_VECTOR | gdal.GA_ReadOnly)
     aoi_layer = aoi_ds.GetLayer()
@@ -135,7 +489,7 @@ def calc_flow_dir(
     geoprocessing.warp_raster(
         base_dem_raster_path,
         POP_PIXEL_SIZE,
-        clipped_dem_path,
+        target_clipped_dem_path,
         "nearest",
         target_bb=bounding_box,
         vector_mask_options={
@@ -144,15 +498,17 @@ def calc_flow_dir(
             "target_mask_value": 0,
         },
     )
-    r = gdal.OpenEx(clipped_dem_path, gdal.OF_RASTER | gdal.OF_UPDATE)
+    r = gdal.OpenEx(target_clipped_dem_path, gdal.OF_RASTER | gdal.OF_UPDATE)
     b = r.GetRasterBand(1)
     b.SetNoDataValue(0)
     b = None
     r = None
 
-    filled_dem_path = os.path.join(local_workspace_dir, f"{analysis_id}_dem_filled.tif")
+    filled_dem_path = clean_it(
+        os.path.join(local_workspace_dir, f"{analysis_id}_dem_filled.tif")
+    )
     routing.fill_pits(
-        (clipped_dem_path, 1),
+        (target_clipped_dem_path, 1),
         filled_dem_path,
         working_dir=local_workspace_dir,
         max_pixel_fill_count=10000,
@@ -163,8 +519,6 @@ def calc_flow_dir(
         target_flow_dir_path,
         working_dir=local_workspace_dir,
     )
-
-    return clipped_dem_path
 
 
 def rasterize(aoi_vector_path, dem_raster_path, aoi_raster_mask_path):
@@ -178,8 +532,11 @@ def rasterize(aoi_vector_path, dem_raster_path, aoi_raster_mask_path):
 
 
 def mask_by_nonzero_and_sum(
-    analysis_id, base_raster_path, mask_raster_path, target_masked_path
+    raster_key, base_raster_path, mask_raster_path, target_masked_path
 ):
+    temp_dir = tempfile.gettempdir()
+    os.makedirs(temp_dir, exist_ok=True)
+
     base_raster_info = geoprocessing.get_raster_info(base_raster_path)
     mask_raster_info = geoprocessing.get_raster_info(mask_raster_path)
     nodata = base_raster_info["nodata"][0]
@@ -189,22 +546,36 @@ def mask_by_nonzero_and_sum(
         result[mask_array <= 0] = nodata
         return result
 
-    working_dir_path = os.path.dirname(target_masked_path)
     aligned_raster_path_list = [
-        os.path.join(
-            working_dir_path,
-            analysis_id,
-            f"%s_{analysis_id}_aligned%s" % os.path.splitext(os.path.basename(path)),
+        clean_it(
+            os.path.join(
+                temp_dir,
+                f"%s_{raster_key}_aligned%s" % os.path.splitext(os.path.basename(path)),
+            )
         )
         for path in [base_raster_path, mask_raster_path]
     ]
-    geoprocessing.align_and_resize_raster_stack(
+    align_and_resize_raster_stack(
         [base_raster_path, mask_raster_path],
         aligned_raster_path_list,
         ["near"] * 2,
         mask_raster_info["pixel_size"],
         mask_raster_info["bounding_box"],
     )
+
+    error = False
+    for path in aligned_raster_path_list:
+        if not os.path.exists(path):
+            LOGGER.error(
+                f"{path} does not exist but the command to make it has executed"
+            )
+            error = True
+    if error:
+        raise RuntimeError(
+            f"calling mask by nonzero and um like this caused a crash: "
+            f"{raster_key}, {base_raster_path}, {mask_raster_path}, "
+            f"{target_masked_path}"
+        )
 
     geoprocessing.raster_calculator(
         [(path, 1) for path in aligned_raster_path_list],
@@ -215,6 +586,8 @@ def mask_by_nonzero_and_sum(
         allow_different_blocksize=True,
         skip_sparse=True,
     )
+    for raster_path in aligned_raster_path_list:
+        os.remove(raster_path)
 
     array = gdal.OpenEx(target_masked_path).ReadAsArray()
     array = array[array != nodata]
@@ -291,29 +664,41 @@ def subset_subwatersheds(
 
     # Load all relevant subwatersheds in one go
     with fiona.open(subwatershed_vector_path, "r") as subwatershed_vector:
-        fetched_subwatersheds = [
-            f
-            for f in subwatershed_vector
-            if f["properties"]["HYBAS_ID"] in all_hybas_ids
-        ]
+        fetched_subwatersheds = []
+        for f in subwatershed_vector:
+            if f["properties"]["HYBAS_ID"] in all_hybas_ids:
+                geom = f.get("geometry")
+                # there's a lot of double checking I do here because some of
+                # the geometries we get seem to be None or have some other
+                # invalid values?
+                if geom is None:
+                    continue  # Skip features with no geometry at all
+                shapely_geom = shape(geom)
+                if shapely_geom.is_empty:
+                    continue  # Skip empty geometries
+                fetched_subwatersheds.append(f)
 
-    # guard against features that have no geometry
-    valid_features = [
-        f
-        for f in fetched_subwatersheds
-        if f["geometry"] is not None and f["geometry"] != {}
-    ]
+    # Explicit guard to handle empty geometries clearly
+    if not fetched_subwatersheds:
+        LOGGER.warning(
+            f"No valid geometry found in fetched subwatersheds for AOI {aoi_vector_path}. "
+            f"Creating an empty GeoDataFrame."
+        )
 
-    if not valid_features:
-        raise ValueError("No valid geometry available in fetched features.")
+        # Create a valid but empty GeoDataFrame with the correct CRS and columns
+        all_subwatersheds_gdf = gpd.GeoDataFrame({"geometry": []}, crs=subwatershed_crs)
 
-    all_subwatersheds_gdf = gpd.GeoDataFrame.from_features(
-        valid_features, crs=subwatershed_crs
-    )
+        if subwatershed_crs != aoi_crs:
+            all_subwatersheds_gdf = all_subwatersheds_gdf.to_crs(aoi_crs)
 
+        all_subwatersheds_gdf.to_file(subset_subwatersheds_vector_path, driver="GPKG")
+        return  # gracefully exit after writing empty GPKG
+
+    # Continue with existing logic if valid geometries exist
     all_subwatersheds_gdf = gpd.GeoDataFrame.from_features(
         fetched_subwatersheds, crs=subwatershed_crs
     )
+
     all_subwatersheds_gdf.geometry = all_subwatersheds_gdf.geometry.buffer(0)
 
     if subwatershed_crs != aoi_crs:
@@ -322,10 +707,13 @@ def subset_subwatersheds(
     all_subwatersheds_gdf.to_file(subset_subwatersheds_vector_path, driver="GPKG")
 
 
+MASKED_SET = set()
+
+
 def main():
     """Entry point."""
     task_graph = taskgraph.TaskGraph(
-        OUTPUT_DIR, os.cpu_count(), reporting_interval=10.0
+        OUTPUT_DIR, max(1, os.cpu_count() // 2), reporting_interval=10.0
     )
     kernel_task_map = {}
     result = collections.defaultdict(
@@ -339,11 +727,11 @@ def main():
     for analysis_id, aoi_vector_path in ANALYSIS_AOIS.items():
         subset_subwatersheds_vector_path = None
 
-        local_workspace_dir = os.path.join(OUTPUT_DIR, analysis_id)
+        local_workspace_dir = clean_it(os.path.join(OUTPUT_DIR, analysis_id))
         os.makedirs(local_workspace_dir, exist_ok=True)
 
-        aoi_raster_mask_path = os.path.join(
-            local_workspace_dir, f"{analysis_id}_aoi_mask.tif"
+        aoi_raster_mask_path = clean_it(
+            os.path.join(local_workspace_dir, f"{analysis_id}_aoi_mask.tif")
         )
         target_projection_wkt = geoprocessing.get_raster_info(DEM_RASTER_PATH)[
             "projection_wkt"
@@ -363,8 +751,8 @@ def main():
             task_name=f"reproject {analysis_id}",
         )
 
-        subset_subwatersheds_vector_path = os.path.join(
-            local_workspace_dir, f"subwatershed_{analysis_id}.gpkg"
+        subset_subwatersheds_vector_path = clean_it(
+            os.path.join(local_workspace_dir, f"subwatershed_{analysis_id}.gpkg")
         )
         subset_task = task_graph.add_task(
             func=subset_subwatersheds,
@@ -377,8 +765,11 @@ def main():
             target_path_list=[subset_subwatersheds_vector_path],
             task_name=f"subset subwatersheds for {analysis_id}",
         )
-        flow_dir_path = os.path.join(
-            local_workspace_dir, f"{analysis_id}_mfd_flow_dir.tif"
+        flow_dir_path = clean_it(
+            os.path.join(local_workspace_dir, f"{analysis_id}_mfd_flow_dir.tif")
+        )
+        clipped_dem_path = clean_it(
+            os.path.join(local_workspace_dir, f"{analysis_id}_dem.tif")
         )
         flow_dir_task = task_graph.add_task(
             func=calc_flow_dir,
@@ -386,11 +777,11 @@ def main():
                 analysis_id,
                 DEM_RASTER_PATH,
                 subset_subwatersheds_vector_path,
+                clipped_dem_path,
                 flow_dir_path,
             ),
             dependent_task_list=[subset_task],
-            target_path_list=[flow_dir_path],
-            store_result=True,
+            target_path_list=[flow_dir_path, clipped_dem_path],
             task_name=f"calculate flow dir for {analysis_id}",
         )
         clipped_dem_work_list.append(
@@ -399,6 +790,7 @@ def main():
                 (
                     local_workspace_dir,
                     flow_dir_path,
+                    clipped_dem_path,
                     reprojected_aoi_vector_path,
                     aoi_raster_mask_path,
                     flow_dir_task,
@@ -411,11 +803,11 @@ def main():
     for analysis_id, (
         local_workspace_dir,
         flow_dir_path,
+        clipped_dem_path,
         reprojected_aoi_vector_path,
         aoi_raster_mask_path,
         flow_dir_task,
     ) in clipped_dem_work_list:
-        clipped_dem_path = flow_dir_task.get()
         LOGGER.info(f"processing {analysis_id}")
         rasterize_task = task_graph.add_task(
             func=rasterize,
@@ -424,14 +816,14 @@ def main():
                 clipped_dem_path,
                 aoi_raster_mask_path,
             ),
-            dependent_task_list=[reproject_task],
+            dependent_task_list=[flow_dir_task],
             ignore_path_list=[reprojected_aoi_vector_path],
             target_path_list=[aoi_raster_mask_path],
             task_name=f"{analysis_id} raster mask",
         )
 
-        aoi_downstream_flow_mask_path = os.path.join(
-            local_workspace_dir, f"{analysis_id}_aoi_ds_coverage.tif"
+        aoi_downstream_flow_mask_path = clean_it(
+            os.path.join(local_workspace_dir, f"{analysis_id}_aoi_ds_coverage.tif")
         )
         flow_accum_task = task_graph.add_task(
             func=routing.flow_accumulation_mfd,
@@ -445,7 +837,7 @@ def main():
         # buffer out the population and ES downstream data to a mask
         for buffer_size_in_px, buffer_size_in_m in BUFFER_AMOUNTS_IN_PIXELS_M:
             if buffer_size_in_px > 0:
-                buffered_downstream_flow_mask_path = (
+                buffered_downstream_flow_mask_path = clean_it(
                     f"%s_{buffer_size_in_m}m%s"
                     % os.path.splitext(aoi_downstream_flow_mask_path)
                 )
@@ -453,8 +845,8 @@ def main():
                 # within buffer_size_in_px from the center
                 # dimensions should be
                 #    buffer_size_in_px*2+1 X buffer_size_in_px*2+1
-                kernel_path = os.path.join(
-                    local_workspace_dir, f"kernel_{buffer_size_in_m}.tif"
+                kernel_path = clean_it(
+                    os.path.join(local_workspace_dir, f"kernel_{buffer_size_in_m}.tif")
                 )
                 convolve_dependent_task_list = [flow_accum_task]
                 # this `if` avoids double scheduling of the same task
@@ -492,9 +884,11 @@ def main():
                 **ES_RASTERS,
             }.items():
                 print(f"processing {raster_id} for {buffer_size_in_m}m buffer")
-                masked_raster_path = os.path.join(
-                    local_workspace_dir,
-                    f"{analysis_id}_{buffer_size_in_m}m_{raster_id}.tif",
+                masked_raster_path = clean_it(
+                    os.path.join(
+                        local_workspace_dir,
+                        f"{analysis_id}_{buffer_size_in_m}m_{raster_id}.tif",
+                    )
                 )
                 mask_by_nonzero_task = task_graph.add_task(
                     func=mask_by_nonzero_and_sum,
@@ -509,6 +903,15 @@ def main():
                     store_result=True,
                     task_name=f"{analysis_id}_population mask",
                 )
+                mask_key = (
+                    f"{analysis_id}_{raster_id}_{buffer_size_in_m}",
+                    raster_path,
+                    buffered_downstream_flow_mask_path,
+                    masked_raster_path,
+                )
+                if mask_key in MASKED_SET:
+                    raise RuntimeError(f"{mask_key} was already created somehow")
+                MASKED_SET.add(mask_key)
                 file.write(
                     f"{analysis_id}_{raster_id}, {raster_path}, {buffered_downstream_flow_mask_path}, {masked_raster_path}\n"
                 )
@@ -535,10 +938,12 @@ def main():
                 es_mask_raster_path = result[analysis_id][es_raster_id][
                     buffer_size_in_m
                 ]["target_raster_path"]
-                dbsi_raster_path = os.path.join(
-                    local_workspace_dir,
-                    f"{analysis_id}_{pop_raster_id}_{es_raster_id}_"
-                    f"{buffer_size_in_m}m_dbsi.tif",
+                dbsi_raster_path = clean_it(
+                    os.path.join(
+                        local_workspace_dir,
+                        f"{analysis_id}_{pop_raster_id}_{es_raster_id}_"
+                        f"{buffer_size_in_m}m_dbsi.tif",
+                    )
                 )
                 dbsi_task = task_graph.add_task(
                     func=fast_multiply_and_sum,
@@ -560,7 +965,9 @@ def main():
                 ] = {"task": dbsi_task, "target_raster_path": dbsi_raster_path}
 
     timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    output_filename = os.path.join(OUTPUT_DIR, f"analysis_results_{timestamp}.csv")
+    output_filename = clean_it(
+        os.path.join(OUTPUT_DIR, f"analysis_results_{timestamp}.csv")
+    )
 
     with open(output_filename, "w", newline="") as f:
         writer = csv.writer(f)
@@ -616,7 +1023,7 @@ def main():
                             dpsi_path,
                         ]
                     )
-        for analysis_id, vector_path in BAD_AOIS:
+        for analysis_id, vector_path in BAD_AOIS.items():
             writer.writerow([analysis_id, "INVALID VECTOR", vector_path])
 
     task_graph.join()
@@ -626,4 +1033,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # mask_by_nonzero_and_sum(
+    #     "gindrii_landscan-global-2023_0",
+    #     "./data/pop_rasters/landscan-global-2023.tif",
+    #     "./workspace_downstream_es_analysis/gindrii/gindrii_aoi_ds_coverage.tif",
+    #     "./workspace_downstream_es_analysis/gindrii/gindrii_0m_landscan-global-2023.tif",
+    # )
     main()
