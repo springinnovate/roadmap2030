@@ -53,13 +53,36 @@ DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"
 AOI_DIRS = ["./data/WWF-Int_Pilot", "./data/WWF-US_Pilot"]
 
 ANALYSIS_AOIS = {}
+BAD_AOIS = {}
 
 for aoi_dir in AOI_DIRS:
     for ext in ["shp", "gpkg"]:
         pattern = os.path.join(aoi_dir, "**", f"*.{ext}")
         for file_path in glob.glob(pattern, recursive=True):
             basename = os.path.splitext(os.path.basename(file_path))[0]
-            ANALYSIS_AOIS[basename] = file_path
+            try:
+                ds = gdal.OpenEx(file_path, gdal.OF_VECTOR)
+                if ds is None:
+                    raise ValueError("Invalid dataset")
+
+                layer = ds.GetLayer()
+                if layer is None or layer.GetFeatureCount() == 0:
+                    raise ValueError("Dataset has no valid layer or features")
+
+                # Check if features have valid geometry
+                has_geometry = False
+                for feature in layer:
+                    geom = feature.GetGeometryRef()
+                    if geom is not None and not geom.IsEmpty():
+                        has_geometry = True
+                        break
+
+                if not has_geometry:
+                    raise ValueError("No valid geometry found in features")
+
+                ANALYSIS_AOIS[basename] = file_path
+            except Exception:
+                BAD_AOIS[basename] = file_path
 
 POPULATION_RASTERS = {
     "landscan-global-2023": "./data/pop_rasters/landscan-global-2023.tif",
@@ -273,6 +296,20 @@ def subset_subwatersheds(
             for f in subwatershed_vector
             if f["properties"]["HYBAS_ID"] in all_hybas_ids
         ]
+
+    # guard against features that have no geometry
+    valid_features = [
+        f
+        for f in fetched_subwatersheds
+        if f["geometry"] is not None and f["geometry"] != {}
+    ]
+
+    if not valid_features:
+        raise ValueError("No valid geometry available in fetched features.")
+
+    all_subwatersheds_gdf = gpd.GeoDataFrame.from_features(
+        valid_features, crs=subwatershed_crs
+    )
 
     all_subwatersheds_gdf = gpd.GeoDataFrame.from_features(
         fetched_subwatersheds, crs=subwatershed_crs
@@ -579,6 +616,8 @@ def main():
                             dpsi_path,
                         ]
                     )
+        for analysis_id, vector_path in BAD_AOIS:
+            writer.writerow([analysis_id, "INVALID VECTOR", vector_path])
 
     task_graph.join()
     task_graph.close()
