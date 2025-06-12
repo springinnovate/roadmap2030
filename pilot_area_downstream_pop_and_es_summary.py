@@ -57,9 +57,7 @@ BUFFER_AMOUNTS_IN_PIXELS_M = [
 GLOBAL_SUBWATERSHEDS_VECTOR_PATH = "./dem_precondition/data/merged_lev06.shp"
 DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"
 
-AOI_DIRS = [
-    "./data/WWF-Int_Pilot",
-]
+AOI_DIRS = ["./data/WWF-Int_Pilot", "./data/aoi_by_country"]
 
 ANALYSIS_AOIS = {}
 BAD_AOIS = {}
