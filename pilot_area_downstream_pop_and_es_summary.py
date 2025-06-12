@@ -1001,6 +1001,10 @@ def main():
                 POPULATION_RASTERS, ES_RASTERS
             ):
                 for buffer_size_in_m in result[analysis_id][pop_raster_id]:
+                    LOGGER.info(
+                        f"processing {analysis_id}-{pop_raster_id}-"
+                        f"{es_raster_id}-{buffer_size_in_m}m"
+                    )
                     pop_sum = result[analysis_id][pop_raster_id][buffer_size_in_m][
                         "task"
                     ].get()

@@ -22,10 +22,12 @@ COUNTRY_VECTOR_PATH = (
 )
 COUNTRY_NAME_FIELD_ID = "iso3"
 COUNTRIES_TO_EXTRACT = ["COL", "NPL", "PRY", "UGA", "VNM"]
-AOI_DIR = "./data/aoi_polys"
+AOI_DIR = "./data/WWF-Int_Pilot"
+OUTPUT_DIR = "./data/aoi_by_country"
+
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     stream=sys.stdout,
     format=(
         "%(asctime)s (%(relativeCreated)d) %(levelname)s %(name)s"
@@ -33,6 +35,7 @@ logging.basicConfig(
     ),
 )
 LOGGER = logging.getLogger(__name__)
+logging.getLogger("fiona").setLevel(logging.WARNING)
 
 
 def crawl_for_valid_vectors(dir_path):
@@ -60,11 +63,13 @@ def main():
     base_vector_dict = crawl_for_valid_vectors(AOI_DIR)
     country_gdf = gpd.read_file(COUNTRY_VECTOR_PATH)
     country_crs = country_gdf.crs
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     for country_name in COUNTRIES_TO_EXTRACT:
-        country_geom = country_gdf[
-            country_gdf[COUNTRY_NAME_FIELD_ID] == country_name
-        ].geometry.unary_union
+        LOGGER.info(country_name)
+        country_geom = gpd.GeoDataFrame(
+            country_gdf[country_gdf[COUNTRY_NAME_FIELD_ID] == country_name].geometry
+        ).union_all()
 
         intersections = []
 
@@ -73,20 +78,20 @@ def main():
             if aoi_gdf.crs != country_crs:
                 aoi_gdf = aoi_gdf.to_crs(country_crs)
 
-            intersection = aoi_gdf[
-                aoi_gdf.geometry.intersects(country_geom)
+            intersection = aoi_gdf[aoi_gdf.geometry.intersects(country_geom)][
+                ["geometry"]
             ].copy()
             if not intersection.empty:
-                intersection.geometry = intersection.geometry.intersection(
-                    country_geom
-                )
+                intersection.geometry = intersection.geometry.intersection(country_geom)
                 intersections.append(intersection)
 
         if intersections:
             combined_gdf = gpd.GeoDataFrame(
                 pd.concat(intersections, ignore_index=True), crs=country_crs
             )
-            output_filename = f"{country_name}_combined_aoi.gpkg"
+            output_filename = os.path.join(
+                OUTPUT_DIR, f"{country_name}_combined_aoi.gpkg"
+            )
             combined_gdf.to_file(output_filename, driver="GPKG")
             print(f"Saved combined AOI for {country_name} to {output_filename}")
 
