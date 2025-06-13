@@ -21,7 +21,11 @@ COUNTRY_VECTOR_PATH = (
     "data/countries/countries_iso3_md5_6fb2431e911401992e6e56ddf0a9bcda.gpkg"
 )
 COUNTRY_NAME_FIELD_ID = "iso3"
-COUNTRIES_TO_EXTRACT = ["COL", "NPL", "PRY", "UGA", "VNM"]
+COUNTRIES_TO_EXTRACT = [
+    "GBR",
+    "VNM",
+    "MYS",
+]  # ["COL", "NPL", "PRY", "UGA", "VNM"]
 AOI_DIR = "./data/WWF-Int_Pilot"
 OUTPUT_DIR = "./data/aoi_by_country"
 
