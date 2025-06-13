@@ -1,3 +1,5 @@
+"""6/13/205 (3:51pm) (Friday before vacation) Becky needed this an emergency analysis, it's nearly copied and pasted from `doit.py` except it walks a directory path looking for vectors."""
+
 import collections
 import csv
 import datetime
