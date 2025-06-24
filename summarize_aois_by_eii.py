@@ -71,7 +71,7 @@ for aoi_dir in AOI_DIRS:
                 BAD_AOIS[basename] = file_path
 
 
-OUTPUT_DIR = "./results"
+OUTPUT_DIR = "./eii_summary_results"
 CLIPPED_DIR = os.path.join(OUTPUT_DIR, "clipped")
 for dirpath in [OUTPUT_DIR, CLIPPED_DIR]:
     os.makedirs(dirpath, exist_ok=True)

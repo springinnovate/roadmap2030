@@ -21,11 +21,6 @@ COUNTRY_VECTOR_PATH = (
     "data/countries/countries_iso3_md5_6fb2431e911401992e6e56ddf0a9bcda.gpkg"
 )
 COUNTRY_NAME_FIELD_ID = "iso3"
-COUNTRIES_TO_EXTRACT = [
-    "GBR",
-    "VNM",
-    "MYS",
-]  # ["COL", "NPL", "PRY", "UGA", "VNM"]
 AOI_DIR = "./data/WWF-Int_Pilot"
 OUTPUT_DIR = "./data/aoi_by_country"
 
@@ -69,8 +64,7 @@ def main():
     country_crs = country_gdf.crs
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    for country_name in COUNTRIES_TO_EXTRACT:
-        LOGGER.info(country_name)
+    for country_name in country_gdf[COUNTRY_NAME_FIELD_ID]:
         country_geom = gpd.GeoDataFrame(
             country_gdf[country_gdf[COUNTRY_NAME_FIELD_ID] == country_name].geometry
         ).union_all()
