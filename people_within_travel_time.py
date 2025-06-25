@@ -1,34 +1,19 @@
 """Distance to habitat with a friction layer."""
 
-import collections
-import csv
-import datetime
 import glob
-import hashlib
-import itertools
 import logging
 import os
 import sys
-import tempfile
 
-from ecoshard.geoprocessing.geoprocessing_core import (
-    DEFAULT_GTIFF_CREATION_TUPLE_OPTIONS,
-    DEFAULT_OSR_AXIS_MAPPING_STRATEGY,
-)
-from ecoshard import geoprocessing
-from ecoshard import taskgraph
-from ecoshard.geoprocessing import routing
 from osgeo import gdal
+from pyproj import CRS
+from rasterio.warp import calculate_default_transform, reproject, Resampling
 from shapely.geometry import box
 from shapely.geometry import shape
-from shapely.ops import transform
 import fiona
 import geopandas as gpd
-import numpy as np
-from pyproj import CRS
 import rasterio
 import rasterio.mask
-from rasterio.warp import calculate_default_transform, reproject, Resampling
 
 import shortest_distances
 
@@ -43,7 +28,6 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 LOGGER = logging.getLogger(__name__)
-logging.getLogger().addHandler(logging.FileHandler("log.txt"))
 logging.getLogger("taskgraph").setLevel(logging.DEBUG)
 logging.getLogger("rasterio").setLevel(logging.WARNING)
 logging.getLogger("fiona").setLevel(logging.WARNING)
@@ -199,7 +183,14 @@ def main():
 
         # Write rasterized AOI
         aoi_meta = ref_meta.copy()
-        aoi_meta.update({"count": 1, "dtype": rasterio.uint8, "nodata": 0})
+        aoi_meta.update(
+            {
+                "count": 1,
+                "dtype": rasterio.uint8,
+                "nodata": 0,
+                "compress": "lzw",
+            }
+        )
 
         with rasterio.open(target_aoi_raster_path, "w", **aoi_meta) as dst:
             dst.write(rasterized_shape, 1)
@@ -213,27 +204,20 @@ def main():
         with rasterio.open(target_aoi_raster_path) as mask_ds:
             mask_array = mask_ds.read(1).astype("int8")
 
-        # Since your AOI covers the entire raster, core_i and core_j start at 0,
-        # and core_size_i/j match the dimensions of the raster itself:
-        core_i, core_j = 0, 0
-        core_size_i, core_size_j = n_rows, n_cols
-
         LOGGER.info(f"about to calculate {n_cols} X {n_rows} raster")
-
+        target_max_reach_raster_path = f"{aoi_basename}_max_reach.tif"
         array = shortest_distances.find_mask_reach(
             friction_array,
             mask_array,
             cell_length_m,
-            core_i,
-            core_j,
-            core_size_i,
-            core_size_j,
             n_cols,
             n_rows,
             MAX_TIME,
         )
+        with rasterio.open(target_max_reach_raster_path, "w", **aoi_meta) as max_reach:
+            max_reach.write(array, 1)
+
         LOGGER.info("all done")
-        LOGGER.debug(array)
         return
 
 

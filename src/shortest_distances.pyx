@@ -1,5 +1,18 @@
 # cython: language_level=3
 # distutils: language=c++
+cdef extern from *:
+    """
+    #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+    """
+
+cdef extern from *:
+    """
+    static const int ioff[8] = {1, 1, 0, -1, -1, -1, 0, 1};
+    static const int joff[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+    """
+    const int ioff[8]
+    const int joff[8]
+
 import time
 import logging
 import sys
@@ -12,6 +25,7 @@ import numpy
 cimport cython
 cimport numpy
 from libc.stdio cimport printf
+from libc.math cimport sqrtf
 from libc.time cimport time as ctime
 from libc.time cimport time_t
 from libcpp.deque cimport deque
@@ -44,11 +58,7 @@ ctypedef priority_queue[
 # functor for priority queue of pixels
 cdef cppclass LessPixel nogil:
     bint get "operator()"(ValuePixelType& lhs, ValuePixelType& rhs):
-        if lhs.edge_weight < rhs.edge_weight:
-            return 1
-        elif lhs.edge_weight == rhs.edge_weight:
-            return lhs.t_time < rhs.t_time
-        return 0
+        return lhs.t_time > rhs.t_time
 
 
 logging.basicConfig(
@@ -63,166 +73,21 @@ LOGGER = logging.getLogger(__name__)
 @cython.wraparound(False)
 @cython.boundscheck(False)
 @cython.cdivision(True)
-def find_population_reach(
-        numpy.ndarray[float, ndim=2] friction_array,
-        numpy.ndarray[float, ndim=2] population_array,
-        double cell_length_m, int core_i, int core_j,
-        int core_size_i, int core_size_j,
-        int n_cols, int n_rows,
-        double max_time):
-    """Define later
-
-    Parameters:
-        friction_array (numpy.ndarray): array with friction values for
-            determining lcp in units minutes/pixel.
-        population_array (numpy.ndarray): array with population values per
-            pixel.
-        cell_length_m (double): length of cell in meters.
-        core_i/core_j (int): defines the ul corner of the core in
-            arrays.
-        core_size_i/j (int): defines the w/h of the core slice in
-            arrays.
-        n_cols/n_rows (int): number of cells in i/j direction of given arrays.
-        max_time (double): the time allowed when computing population reach
-            in minutes.
-
-    Returns:
-        tuple:
-        (2D array of population reach of the same size as input arrays,
-         2D array of normalized population reach of the same size as input arrays).
-
-    """
-    cdef int i, j
-    cdef float inf = numpy.inf
-    cdef numpy.ndarray[float, ndim=2] pop_coverage = numpy.zeros(
-        (n_rows, n_cols), dtype=numpy.float32)
-    cdef numpy.ndarray[float, ndim=2] norm_pop_coverage = numpy.zeros(
-        (n_rows, n_cols), dtype=numpy.float32)
-    cdef numpy.ndarray[float, ndim=2] current_time = numpy.full(
-        (n_rows, n_cols), inf, dtype=numpy.float32)
-
-    cdef int *ioff = [1, 1, 0, -1, -1, -1, 0, 1]
-    cdef int *joff = [0, 1, 1, 1, 0, -1, -1, -1]
-    cdef float *dist_edge = [
-        cell_length_m,
-        cell_length_m*2**0.5,
-        cell_length_m,
-        cell_length_m*2**0.5,
-        cell_length_m,
-        cell_length_m*2**0.5,
-        cell_length_m,
-        cell_length_m*2**0.5]
-    cdef float frict_n, c_time, n_time, edge_weight, normalized_pop, population_val
-    cdef int i_start, j_start, i_n, j_n
-    cdef int min_i, min_j, max_i, max_j
-
-    cdef DistPriorityQueueType dist_queue
-    cdef ValuePixelType pixel
-    cdef int n_visited
-    with nogil:
-        for i_start in range(core_i, core_i+core_size_i):
-            printf("i_start = %d\n", i_start)
-            for j_start in range(core_j, core_j+core_size_j):
-                population_val = population_array[j_start, i_start]
-                if population_val <= 0:
-                    continue
-                pixel.t_time = 0
-                pixel.edge_weight = 0
-                pixel.i = i_start
-                pixel.j = j_start
-                dist_queue.push(pixel)
-                current_time[j_start, i_start] = 0
-                min_i = i_start
-                max_i = i_start
-                min_j = j_start
-                max_j = j_start
-
-                # c_ -- current, n_ -- neighbor
-                while dist_queue.size() > 0:
-                    pixel = dist_queue.top()
-                    dist_queue.pop()
-                    c_time = pixel.t_time
-                    i = pixel.i
-                    j = pixel.j
-                    if c_time > current_time[j, i]:
-                        # this means another path already reached here that's
-                        # better
-                        continue
-                    if i < min_i:
-                        min_i = i
-                    elif i > max_i:
-                        max_i = i
-                    if j < min_j:
-                        min_j = j
-                    elif j > max_j:
-                        max_j = j
-
-                    for v in range(8):
-                        i_n = i+ioff[v]
-                        j_n = j+joff[v]
-                        if i_n < 0 or i_n >= n_cols:
-                            continue
-                        if j_n < 0 or j_n >= n_rows:
-                            continue
-                        if population_array[j_n, i_n] < 0:
-                            # nodata, so skip
-                            continue
-                        frict_n = friction_array[j_n, i_n]
-                        # the nodata value is undefined but will present as 0.
-                        if frict_n <= 0:
-                            continue
-                        edge_weight = frict_n*dist_edge[v]
-                        n_time = c_time + edge_weight
-                        if n_time > max_time:
-                            continue
-                        # if visited before and we got there faster, then skip
-                        if n_time >= current_time[j_n, i_n]:
-                            continue
-                        current_time[j_n, i_n] = n_time
-                        pixel.t_time = n_time
-                        pixel.edge_weight = edge_weight
-                        pixel.i = i_n
-                        pixel.j = j_n
-                        dist_queue.push(pixel)
-                n_visited = 0
-                for i in range(min_i, max_i+1):
-                    for j in range(min_j, max_j+1):
-                        if current_time[j, i] < inf:
-                            n_visited += 1
-                            pop_coverage[j, i] += population_val
-                normalized_pop = population_val / float(n_visited)
-                for i in range(min_i, max_i+1):
-                    for j in range(min_j, max_j+1):
-                        if current_time[j, i] < inf:
-                            norm_pop_coverage[j, i] += normalized_pop
-                            # reset for next iteration
-                            current_time[j, i] = inf
-    return pop_coverage, norm_pop_coverage
-
-
-@cython.wraparound(False)
-@cython.boundscheck(False)
-@cython.cdivision(True)
 def find_mask_reach(
         numpy.ndarray[float, ndim=2] friction_array,
         numpy.ndarray[numpy.int8_t, ndim=2] mask_array,
-        double cell_length_m, int core_i, int core_j,
-        int core_size_i, int core_size_j,
+        float cell_length_m,
         int n_cols, int n_rows,
-        double max_time):
+        float max_time):
     """Define later
 
     Parameters:
         friction_array (numpy.ndarray): array with friction values for
             determining lcp in units minutes/pixel.
         mask_array (numpy.ndarray): array with 1 or 0 indicating mask location
-        cell_length_m (double): length of cell in meters.
-        core_i/core_j (int): defines the ul corner of the core in
-            arrays.
-        core_size_i/j (int): defines the w/h of the core slice in
-            arrays.
+        cell_length_m (float): length of cell in meters.
         n_cols/n_rows (int): number of cells in i/j direction of given arrays.
-        max_time (double): the time allowed when computing population reach
+        max_time (float): the time allowed when computing population reach
             in minutes.
 
     Returns:
@@ -231,23 +96,12 @@ def find_mask_reach(
     """
     printf("starting shortest distances")
     cdef int i, j
-    cdef float inf = numpy.inf
     cdef numpy.ndarray[numpy.uint8_t, ndim=2] mask_coverage = numpy.zeros(
         (n_rows, n_cols), dtype=numpy.uint8)
-    cdef numpy.ndarray[float, ndim=2] current_time = numpy.full(
-        (n_rows, n_cols), inf, dtype=numpy.float32)
+    cdef numpy.ndarray[float, ndim=2] current_time = numpy.where(
+        mask_array == 1, 0, numpy.inf).astype(numpy.float32)
 
-    cdef int[:] ioff = [1, 1, 0, -1, -1, -1, 0, 1]
-    cdef int[:] joff[8] = [0, 1, 1, 1, 0, -1, -1, -1]
-    cdef float dist_edge[8]
-    dist_edge[0] = cell_length_m
-    dist_edge[1] = cell_length_m * M_SQRT2
-    dist_edge[2] = cell_length_m
-    dist_edge[3] = cell_length_m * M_SQRT2
-    dist_edge[4] = cell_length_m
-    dist_edge[5] = cell_length_m * M_SQRT2
-    dist_edge[6] = cell_length_m
-    dist_edge[7] = cell_length_m * M_SQRT2
+    cdef float diag_cell_length_m = sqrtf(<float>(2*cell_length_m*cell_length_m))
     cdef float frict_n, c_time, n_time, edge_weight
     cdef int i_start, j_start, i_n, j_n
     cdef int min_i, min_j, max_i, max_j
@@ -255,12 +109,10 @@ def find_mask_reach(
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
-    cdef int n_visited
     with nogil:
-        for i_start in range(core_i, core_i+core_size_i):
-            for j_start in range(core_j, core_j+core_size_j):
-                mask_val = mask_array[j_start, i_start]
-                if mask_val != 1:
+        for i_start in range(n_cols):
+            for j_start in range(n_rows):
+                if mask_array[j_start, i_start] != 1:
                     continue
                 mask_coverage[j_start, i_start] = 1
 
@@ -269,7 +121,6 @@ def find_mask_reach(
                 pixel.i = i_start
                 pixel.j = j_start
                 dist_queue.push(pixel)
-                current_time[j_start, i_start] = 0
                 min_i = i_start
                 max_i = i_start
                 min_j = j_start
@@ -310,7 +161,11 @@ def find_mask_reach(
                         # the nodata value is undefined but will present as 0.
                         if frict_n <= 0:
                             continue
-                        edge_weight = frict_n*dist_edge[v]
+                        if v & 1:  # if msd is 1, it's odd
+                            edge_weight = frict_n*diag_cell_length_m
+                        else:
+                            edge_weight = frict_n*cell_length_m
+
                         n_time = c_time + edge_weight
                         if n_time > max_time:
                             continue
@@ -323,9 +178,4 @@ def find_mask_reach(
                         pixel.i = i_n
                         pixel.j = j_n
                         dist_queue.push(pixel)
-                n_visited = 0
-                for i in range(min_i, max_i+1):
-                    for j in range(min_j, max_j+1):
-                        # reset for next iteration
-                        current_time[j, i] = inf
     return mask_coverage
