@@ -1,5 +1,6 @@
 """Distance to habitat with a friction layer."""
 
+from datetime import datetime
 import glob
 import logging
 import os
@@ -12,6 +13,8 @@ from shapely.geometry import box
 from shapely.geometry import shape
 import fiona
 import geopandas as gpd
+import numpy as np
+import pandas as pd
 import rasterio
 import rasterio.mask
 
@@ -74,12 +77,20 @@ TARGET_NODATA = -1
 
 # used to avoid computing paths where the population is too low
 POPULATION_COUNT_CUTOFF = 0
-MAX_TIME = 8 * 60  # 8 hours
 BUFFER_DISTANCE_M = 104 * 8 * 1000  # driving 8 hours straight
 
 
-def get_utm_crs(geometry):
-    centroid = geometry.centroid
+def get_utm_crs(geometry, original_crs):
+    # Ensure centroid is calculated in lat/lon
+    if original_crs.is_geographic:
+        centroid = geometry.centroid
+    else:
+        # temporarily project to lat/lon for correct centroid calculation
+        geometry_latlon = (
+            gpd.GeoSeries([geometry], crs=original_crs).to_crs("EPSG:4326").iloc[0]
+        )
+        centroid = geometry_latlon.centroid
+
     utm_zone = int((centroid.x + 180) // 6) + 1
     hemisphere = "north" if centroid.y >= 0 else "south"
     return CRS.from_dict(
@@ -135,90 +146,129 @@ def main():
     """Entry point."""
     for dir_path in [WORKSPACE_DIR, CHURN_DIR]:
         os.makedirs(dir_path, exist_ok=True)
+    results_dict = {}
     for aoi_basename, aoi_path in ANALYSIS_AOIS.items():
-        LOGGER.debug(aoi_path)
-        gdf = gpd.read_file(aoi_path)
-        projected_gdf = gdf.to_crs(get_utm_crs(gdf.union_all()))
-        bbox = projected_gdf.total_bounds
-        buffered_bbox = box(
-            bbox[0] - BUFFER_DISTANCE_M,
-            bbox[1] - BUFFER_DISTANCE_M,
-            bbox[2] + BUFFER_DISTANCE_M,
-            bbox[3] + BUFFER_DISTANCE_M,
-        )
-        bbox_gdf = gpd.GeoDataFrame(
-            {"geometry": [buffered_bbox]}, crs=projected_gdf.crs
-        )
-        LOGGER.debug(bbox_gdf)
-        target_pop_clipped_raster_path = f"{aoi_basename}_population_clipped.tif"
-        target_friction_clipped_raster_path = (
-            f"{aoi_basename}_friction_surface_clipped.tif"
-        )
-        target_aoi_raster_path = f"{aoi_basename}_aoi_rasterized.tif"
-        clip_and_reproject_raster(
-            POPULATION_RASTER_PATH,
-            bbox_gdf,
-            projected_gdf.crs,
-            target_pop_clipped_raster_path,
-        )
+        for max_hours in range(1, 9):
+            max_time_mins = max_hours * 60
+            local_workspace_dir = os.path.join(WORKSPACE_DIR, aoi_basename)
+            os.makedirs(local_workspace_dir, exist_ok=True)
+            LOGGER.info(f"processing {aoi_basename}")
+            gdf = gpd.read_file(aoi_path)
+            projected_gdf = gdf.to_crs(get_utm_crs(gdf.union_all(), gdf.crs))
+            bbox = projected_gdf.total_bounds
+            buffer_distance_m = (
+                max_hours * 104 * 1000
+            )  # drive 65mph for that many hours
+            buffered_bbox = box(
+                bbox[0] - buffer_distance_m,
+                bbox[1] - buffer_distance_m,
+                bbox[2] + buffer_distance_m,
+                bbox[3] + buffer_distance_m,
+            )
+            bbox_gdf = gpd.GeoDataFrame(
+                {"geometry": [buffered_bbox]}, crs=projected_gdf.crs
+            )
 
-        with rasterio.open(target_pop_clipped_raster_path) as pop_ref:
-            ref_meta = pop_ref.meta.copy()
+            target_pop_clipped_raster_path = os.path.join(
+                local_workspace_dir,
+                f"{aoi_basename}_population_clipped_{max_time_mins}min.tif",
+            )
+            target_friction_clipped_raster_path = os.path.join(
+                local_workspace_dir,
+                f"{aoi_basename}_friction_surface_clipped.tif",
+            )
+            target_aoi_raster_path = os.path.join(
+                local_workspace_dir,
+                f"{aoi_basename}_aoi_rasterized_{max_time_mins}min.tif",
+            )
+            clip_and_reproject_raster(
+                POPULATION_RASTER_PATH,
+                bbox_gdf,
+                projected_gdf.crs,
+                target_pop_clipped_raster_path,
+            )
 
-        clip_and_reproject_raster(
-            FRICTION_SURFACE_RASTER_PATH,
-            bbox_gdf,
-            projected_gdf.crs,
-            target_friction_clipped_raster_path,
-            reference_meta=ref_meta,
-        )
+            with rasterio.open(target_pop_clipped_raster_path) as pop_ref:
+                ref_meta = pop_ref.meta.copy()
+                pop_array = pop_ref.read(1).astype(np.int64)
 
-        rasterized_shape = rasterio.features.rasterize(
-            ((geom, 1) for geom in projected_gdf.geometry),
-            out_shape=(ref_meta["height"], ref_meta["width"]),
-            transform=ref_meta["transform"],
-            fill=0,
-            dtype=rasterio.uint8,
-        )
+            clip_and_reproject_raster(
+                FRICTION_SURFACE_RASTER_PATH,
+                bbox_gdf,
+                projected_gdf.crs,
+                target_friction_clipped_raster_path,
+                reference_meta=ref_meta,
+            )
 
-        # Write rasterized AOI
-        aoi_meta = ref_meta.copy()
-        aoi_meta.update(
-            {
-                "count": 1,
-                "dtype": rasterio.uint8,
-                "nodata": 0,
-                "compress": "lzw",
-            }
-        )
+            mask_array = rasterio.features.rasterize(
+                ((geom, 1) for geom in projected_gdf.geometry),
+                out_shape=(ref_meta["height"], ref_meta["width"]),
+                transform=ref_meta["transform"],
+                fill=0,
+                dtype=rasterio.uint8,
+            ).astype(np.int8)
 
-        with rasterio.open(target_aoi_raster_path, "w", **aoi_meta) as dst:
-            dst.write(rasterized_shape, 1)
+            # Write rasterized AOI
+            aoi_meta = ref_meta.copy()
+            aoi_meta.update(
+                {
+                    "count": 1,
+                    "dtype": rasterio.uint8,
+                    "nodata": 0,
+                    "compress": "lzw",
+                }
+            )
 
-        with rasterio.open(target_friction_clipped_raster_path) as friction_ds:
-            friction_array = friction_ds.read(1)
-            transform = friction_ds.transform
-            cell_length_m = transform.a  # pixel size (assumes square pixels)
-            n_rows, n_cols = friction_array.shape
+            with rasterio.open(target_aoi_raster_path, "w", **aoi_meta) as dst:
+                dst.write(mask_array, 1)
 
-        with rasterio.open(target_aoi_raster_path) as mask_ds:
-            mask_array = mask_ds.read(1).astype("int8")
+            with rasterio.open(target_friction_clipped_raster_path) as friction_ds:
+                friction_array = friction_ds.read(1)
+                transform = friction_ds.transform
+                cell_length_m = (
+                    transform.a
+                )  # this is the 'a' in the affine transformation, so cell x length
+                n_rows, n_cols = friction_array.shape
 
-        LOGGER.info(f"about to calculate {n_cols} X {n_rows} raster")
-        target_max_reach_raster_path = f"{aoi_basename}_max_reach.tif"
-        array = shortest_distances.find_mask_reach(
-            friction_array,
-            mask_array,
-            cell_length_m,
-            n_cols,
-            n_rows,
-            MAX_TIME,
-        )
-        with rasterio.open(target_max_reach_raster_path, "w", **aoi_meta) as max_reach:
-            max_reach.write(array, 1)
+            LOGGER.info(f"about to calculate {n_cols} X {n_rows} raster")
+            target_max_reach_raster_path = (
+                f"{aoi_basename}_max_reach_{max_time_mins}min.tif"
+            )
+            travel_reach_array = shortest_distances.find_mask_reach(
+                friction_array,
+                mask_array,
+                cell_length_m,
+                n_cols,
+                n_rows,
+                max_time_mins,
+            )
+            with rasterio.open(
+                target_max_reach_raster_path, "w", **aoi_meta
+            ) as max_reach:
+                max_reach.write(travel_reach_array, 1)
+            in_range_pop_count = np.sum(
+                pop_array[(travel_reach_array > 0) & (pop_array > 0)]
+            )
 
-        LOGGER.info("all done")
-        return
+            LOGGER.debug(
+                f"{aoi_basename} {max_time_mins//60}hours {in_range_pop_count}"
+            )
+            if aoi_basename not in results_dict:
+                results_dict[aoi_basename] = {}
+            results_dict[aoi_basename][max_hours] = in_range_pop_count
+
+    df = pd.DataFrame(results_dict).T.sort_index(axis=0)
+    df = df.sort_index(axis=1)
+
+    # Rename columns clearly
+    df.columns = [f"{hour}_hours" for hour in df.columns]
+
+    # Save DataFrame to CSV with current timestamp in filename
+    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    csv_filename = f"people_within_travel_time_{timestamp}.csv"
+    df.to_csv(csv_filename)
+
+    LOGGER.info(f"Saved results to {csv_filename}")
 
 
 if __name__ == "__main__":

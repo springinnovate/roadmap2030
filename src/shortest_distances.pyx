@@ -24,7 +24,6 @@ import numpy
 
 cimport cython
 cimport numpy
-from libc.stdio cimport printf
 from libc.math cimport sqrtf
 from libc.time cimport time as ctime
 from libc.time cimport time_t
@@ -94,7 +93,6 @@ def find_mask_reach(
         2D array of mask reach of the same size as input arrays.
 
     """
-    printf("starting shortest distances")
     cdef int i, j
     cdef numpy.ndarray[numpy.uint8_t, ndim=2] mask_coverage = numpy.zeros(
         (n_rows, n_cols), dtype=numpy.uint8)
