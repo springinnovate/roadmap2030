@@ -231,8 +231,9 @@ def main():
                 n_rows, n_cols = friction_array.shape
 
             LOGGER.info(f"about to calculate {n_cols} X {n_rows} raster")
-            target_max_reach_raster_path = (
-                f"{aoi_basename}_max_reach_{max_time_mins}min.tif"
+            target_max_reach_raster_path = os.path.join(
+                local_workspace_dir,
+                f"{aoi_basename}_max_reach_{max_time_mins}min.tif",
             )
             travel_reach_array = shortest_distances.find_mask_reach(
                 friction_array,
