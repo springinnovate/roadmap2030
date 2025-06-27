@@ -70,7 +70,7 @@ print(complete_sets)
 
 
 def main():
-    # iterate over complete sets and clip/resize them against the population raster so they all fit nicely
+    # iterate over complete sets and clip/resize them against the population raster so they all fit nicelyxo
     pass
 
 
