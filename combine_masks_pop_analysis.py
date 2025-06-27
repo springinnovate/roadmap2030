@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 
+from ecoshard import geoprocessing
 from ecoshard import taskgraph
 from osgeo import gdal
 from pyproj import CRS
@@ -48,6 +49,7 @@ SUFFIXES = {
     "_aoi_ds_coverage_1000m.tif",
 }
 
+
 matched_rasters = defaultdict(dict)
 
 for raster_dir in MASK_DIRS:
@@ -60,18 +62,25 @@ for raster_dir in MASK_DIRS:
                 matched_rasters[prefix][suffix] = file_path
 
 # Filter out incomplete sets if necessary
-complete_sets = {
-    prefix: paths
-    for prefix, paths in matched_rasters.items()
-    if SUFFIXES.issubset(paths)
+COMPLETE_SETS = {
+    prefix: suffix_path_dict.values()
+    for prefix, suffix_path_dict in matched_rasters.items()
+    if SUFFIXES.issubset(suffix_path_dict)
 }
 
-print(complete_sets)
+
+POLLINATION_RASTER_PATH = r"./data/ABUNCHASERVICES/ndv_0.0_realized_pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif"
 
 
 def main():
-    # iterate over complete sets and clip/resize them against the population raster so they all fit nicelyxo
-    pass
+    for prefix, path_list in COMPLETE_SETS.items():
+        LOGGER.info(f"processing {prefix}")
+        LOGGER.info(path_list)
+        for path in path_list:
+            raster_info = geoprocessing.get_raster_info(path)
+            LOGGER.info(raster_info["raster_size"])
+        # iterate over complete sets and clip/resize them against the population raster so they all fit nicelyxo
+        pass
 
 
 if __name__ == "__main__":

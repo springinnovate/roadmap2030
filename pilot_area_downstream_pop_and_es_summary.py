@@ -611,7 +611,21 @@ def create_circular_kernel(kernel_path, buffer_size_in_px):
                 kernel_array[i, j] = 1.0
 
     driver = gdal.GetDriverByName("GTiff")
-    out_raster = driver.Create(kernel_path, diameter, diameter, 1, gdal.GDT_Float32)
+    out_raster = driver.Create(
+        kernel_path,
+        diameter,
+        diameter,
+        1,
+        gdal.GDT_Float32,
+        options=(
+            "TILED=YES",
+            "BIGTIFF=YES",
+            "COMPRESS=LZW",
+            "BLOCKXSIZE=256",
+            "BLOCKYSIZE=256",
+            "NUM_THREADS=ALL_CPUS",
+        ),
+    )
     out_raster.GetRasterBand(1).WriteArray(kernel_array)
     out_raster.FlushCache()
     out_raster = None
