@@ -48,7 +48,7 @@ DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"
 
 POP_PIXEL_SIZE_IN_DEG = 0.008333333333333
 BUFFER_SIZE_IN_M = 1000
-BUFFER_SIZE_IN_PX = np.ceil(1000 / 111000 * POP_PIXEL_SIZE_IN_DEG)
+BUFFER_SIZE_IN_PX = int(np.ceil(BUFFER_SIZE_IN_M / 111000 * POP_PIXEL_SIZE_IN_DEG))
 
 POPULATION_RASTER_PATH = "./data/pop_rasters/landscan-global-2023.tif"
 
@@ -56,6 +56,8 @@ COUNTRY_VECTOR_PATH = (
     "data/countries/countries_iso3_md5_6fb2431e911401992e6e56ddf0a9bcda.gpkg"
 )
 COUNTRY_NAME_FIELD_ID = "iso3"
+
+GLOBAL_TRAVEL_TIME_MASK_1HR_PATH = "."
 
 WORKSPACE_DIR = "./workspace_clip_and_analyze_CNA"
 os.makedirs(WORKSPACE_DIR, exist_ok=True)
@@ -233,7 +235,9 @@ def main():
         task_name=f"warp {warped_masked_cna_raster_path}",
     )
 
-    aoi_downstream_flow_mask_path = os.path.join(WORKSPACE_DIR, "aoi_ds_coverage.tif")
+    aoi_downstream_flow_mask_path = os.path.join(
+        WORKSPACE_DIR, f"aoi_ds_coverage_{BUFFER_SIZE_IN_M}m.tif"
+    )
     flow_accum_task = task_graph.add_task(
         func=routing.flow_accumulation_mfd,
         args=((target_flow_dir_path, 1), aoi_downstream_flow_mask_path),

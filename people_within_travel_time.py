@@ -9,6 +9,7 @@ import sys
 from ecoshard import taskgraph
 from osgeo import gdal
 from pyproj import CRS
+from pyproj import Transformer
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from shapely.geometry import box
 from shapely.geometry import shape
@@ -39,8 +40,9 @@ logging.getLogger("fiona").setLevel(logging.WARNING)
 
 
 AOI_DIRS = [
-    "./data/aoi_by_country",
-    "./data/WWF-Int_Pilot",
+    # "./data/aoi_by_country",
+    # "./data/WWF-Int_Pilot",
+    "./data/Prod_scapes_EE_wflags",
 ]
 
 ANALYSIS_AOIS = {}
@@ -78,38 +80,113 @@ POPULATION_RASTER_PATH = "./data/pop_rasters/landscan-global-2023.tif"
 WORKSPACE_DIR = "workspace_dist_to_hab_with_friction"
 os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
-# used to buffer the raster for determinine access distance
-BUFFER_DISTANCE_M = 104 * 8 * 1000  # driving 8 hours straight
+TRAVEL_TIME_HOURS = list(range(1, 2))
+
+
+def eck4_limits(r=6371000):
+    crs_eck4 = CRS.from_proj4(f"+proj=eck4 +R={r} +units=m +no_defs")
+    T_fwd = Transformer.from_crs("EPSG:4326", crs_eck4, always_xy=True)
+    xs, ys = T_fwd.transform([-180, 180, 0, 0], [0, 0, 90, -90])
+    return abs(xs[0]), abs(ys[2])  # xmax, ymax
+
+
+ECKERT_IV_MAX_X, ECKERT_IV_MAX_Y = eck4_limits()  # ≈ 15 110 000 , 7 540 000
+
+
+def _clamp_eckert_point(x, y):
+    r2 = (x * x) / (ECKERT_IV_MAX_X * ECKERT_IV_MAX_X) + (y * y) / (
+        ECKERT_IV_MAX_Y * ECKERT_IV_MAX_Y
+    )
+    if r2 <= 1:
+        return x, y
+    scale = 0.999 / r2**2
+    return x * scale, y * scale
+
+
+def transform_edge_points_eckert_to_wgs84(bbox_gdf, dst_crs="EPSG:4326"):
+    if bbox_gdf.crs is None:
+        raise ValueError("bbox_gdf must have a CRS defined")
+    if "+proj=eck4" not in bbox_gdf.crs.to_proj4().lower():
+        return bbox_gdf.to_crs(dst_crs)
+
+    minx, miny, maxx, maxy = bbox_gdf.total_bounds
+    raw_corners = [(minx, miny), (minx, maxy), (maxx, maxy), (maxx, miny)]
+    safe_corners = [_clamp_eckert_point(x, y) for x, y in raw_corners]
+
+    transformer = Transformer.from_crs(bbox_gdf.crs, dst_crs, always_xy=True)
+    lonlat = [transformer.transform(x, y) for x, y in safe_corners]
+    xs, ys = zip(*lonlat)
+    proj_box = box(min(xs), min(ys), max(xs), max(ys))
+    return gpd.GeoDataFrame(geometry=[proj_box], crs=dst_crs)
 
 
 def get_utm_crs(geometry, original_crs):
-    # Ensure centroid is calculated in lat/lon
-    LOGGER.info(f"getting the utm crs")
-    if original_crs.is_geographic:
-        centroid = geometry.centroid
-    else:
-        # temporarily project to lat/lon for correct centroid calculation
+    LOGGER.info("getting the utm crs")
+
+    if not original_crs.is_geographic:
         LOGGER.info("not in lat/lon, reprojecting for that")
-        geometry_latlon = (
+        geometry = (
             gpd.GeoSeries([geometry], crs=original_crs).to_crs("EPSG:4326").iloc[0]
         )
-        centroid = geometry_latlon.centroid
 
+    bounds = geometry.bounds
+    width = abs(bounds[2] - bounds[0])
+    height = abs(bounds[3] - bounds[1])
+
+    if width > 6 or height > 6:
+        LOGGER.info("Geometry exceeds 6 degrees, defaulting to Eckert IV projection")
+        return CRS.from_proj4("+proj=eck4 +datum=WGS84 +units=m +no_defs")
+
+    centroid = geometry.centroid
     utm_zone = int((centroid.x + 180) // 6) + 1
-    LOGGER.info(f"determined utm_zone is : {utm_zone}")
     hemisphere = "north" if centroid.y >= 0 else "south"
+
+    LOGGER.info(f"determined utm_zone is : {utm_zone}")
+
     return CRS.from_dict(
         {"proj": "utm", "zone": utm_zone, "south": hemisphere == "south"}
     )
 
 
 def clip_and_reproject_raster(
-    src_path, bbox_geom, dst_crs, dst_path, reference_meta=None
+    base_raster_path, bbox_gdf, dst_crs, target_raster_path, reference_meta=None
 ):
-    with rasterio.open(src_path) as src:
-        bbox_geom_src_crs = bbox_geom.to_crs(src.crs)
-        geom = [bbox_geom_src_crs.geometry.iloc[0]]
-        out_image, out_transform = rasterio.mask.mask(src, geom, crop=True)
+    SPHERE_ECK4 = "+proj=eck4 +R=6371000 +units=m +no_defs"
+    bbox_sph = bbox_gdf.set_crs(
+        SPHERE_ECK4, allow_override=True
+    )  # keep coords the same, just swap CRS tag
+    bbox_wgs = bbox_sph.to_crs("EPSG:4326")  # should be finite
+    LOGGER.info(f"********* quick test: {bbox_wgs.total_bounds}")
+
+    with rasterio.open(base_raster_path) as src:
+        if bbox_gdf.crs is None:
+            raise ValueError("bbox_gdf must have a CRS defined")
+
+        if "+proj=eck4" in bbox_gdf.crs.to_proj4().lower():
+            LOGGER.info("eckert is so broken, just doing regular lat/lng bounds")
+            projected_box_gdf = transform_edge_points_eckert_to_wgs84(bbox_gdf)
+            projected_box_gdf = gpd.GeoDataFrame(
+                geometry=[box(-179, -80, 179, 80)], crs="EPSG:4326"
+            )
+        else:
+            # Check intermediate clamped bounds explicitly:
+            LOGGER.info(f"Clamped bbox bounds: {bbox_gdf.total_bounds}")
+
+            # Safely project to src.crs (e.g., EPSG:4326)
+            projected_box_gdf = bbox_gdf.to_crs(src.crs)
+
+        # Check bounds again after projection
+        LOGGER.info(
+            f"Projected bbox bounds: {projected_box_gdf.total_bounds} / {projected_box_gdf.crs.to_proj4()}"
+        )
+        bbox_projected_geom = [projected_box_gdf.geometry.iloc[0]]
+
+        LOGGER.info(
+            f"Original geom {bbox_gdf} {bbox_gdf.crs} converted to {src.crs}: {bbox_projected_geom}"
+        )
+        out_image, out_transform = rasterio.mask.mask(
+            src, bbox_projected_geom, crop=True
+        )
 
         if reference_meta:
             dst_transform = reference_meta["transform"]
@@ -121,7 +198,7 @@ def clip_and_reproject_raster(
                 dst_crs,
                 out_image.shape[2],
                 out_image.shape[1],
-                *bbox_geom_src_crs.total_bounds,
+                *projected_box_gdf.total_bounds,
             )
 
         out_meta = src.meta.copy()
@@ -135,7 +212,7 @@ def clip_and_reproject_raster(
             }
         )
 
-        with rasterio.open(dst_path, "w", **out_meta) as dst:
+        with rasterio.open(target_raster_path, "w", **out_meta) as dst:
             reproject(
                 source=out_image,
                 destination=rasterio.band(dst, 1),
@@ -156,19 +233,23 @@ def process_aoi(aoi_basename, aoi_path, max_hours, workspace_dir):
     LOGGER.info(f"{aoi_basename}: Reading AOI shapefile from {aoi_path}")
     gdf = gpd.read_file(aoi_path)
 
-    LOGGER.info(f"{aoi_basename}: Projecting AOI geometry to appropriate UTM")
-    projected_gdf = gdf.to_crs(get_utm_crs(gdf.union_all(), gdf.crs))
+    target_crs = get_utm_crs(gdf.union_all(), gdf.crs)
+    LOGGER.info(
+        f"{aoi_basename}: Projecting AOI geometry to appropriate UTM ({target_crs})"
+    )
+    projected_gdf = gdf.to_crs(target_crs)
 
     bbox = projected_gdf.total_bounds
     buffer_distance_m = max_hours * 104 * 1000  # drive 65mph for that many hours
 
-    LOGGER.info(f"{aoi_basename}: Creating buffered bounding box for raster clipping")
     buffered_bbox = box(
         bbox[0] - buffer_distance_m,
         bbox[1] - buffer_distance_m,
         bbox[2] + buffer_distance_m,
         bbox[3] + buffer_distance_m,
     )
+
+    LOGGER.info(f"buffered box: {buffered_bbox}")
     bbox_gdf = gpd.GeoDataFrame({"geometry": [buffered_bbox]}, crs=projected_gdf.crs)
 
     target_pop_clipped_raster_path = os.path.join(
@@ -266,11 +347,12 @@ def main():
     results_dict = {}
     task_list = []
     for aoi_basename, aoi_path in ANALYSIS_AOIS.items():
-        for max_hours in range(1, 9):
+        for max_hours in TRAVEL_TIME_HOURS:
             in_range_pop_count_task = task_graph.add_task(
                 func=process_aoi,
                 args=(aoi_basename, aoi_path, max_hours, WORKSPACE_DIR),
                 store_result=True,
+                transient_run=True,
                 task_name=f"process {aoi_basename} at {max_hours} hours",
             )
             task_list.append((aoi_basename, max_hours, in_range_pop_count_task))

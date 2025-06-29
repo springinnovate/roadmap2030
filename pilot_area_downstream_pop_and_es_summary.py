@@ -50,14 +50,16 @@ logging.getLogger("fiona").setLevel(logging.WARN)
 POP_PIXEL_SIZE = [0.008333333333333, -0.008333333333333]
 km_in_deg = POP_PIXEL_SIZE[0] * 1000 / 900  # because it's 900m so converting to 1km
 BUFFER_AMOUNTS_IN_PIXELS_M = [
-    (int(np.round(x * km_in_deg / POP_PIXEL_SIZE[0])), x * 1000) for x in range(0, 1)
+    (int(np.round(x * km_in_deg / POP_PIXEL_SIZE[0])), x * 1000) for x in range(1, 2)
 ]
 
 # This is relative because Docker will map a volume
 GLOBAL_SUBWATERSHEDS_VECTOR_PATH = "./dem_precondition/data/merged_lev06.shp"
 DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"
 
-AOI_DIRS = ["./data/WWF-Int_Pilot", "./data/aoi_by_country"]
+AOI_DIRS = [
+    "./data/Prod_scapes_EE_wflags",
+]  # "./data/WWF-Int_Pilot", "./data/aoi_by_country"]
 
 ANALYSIS_AOIS = {}
 BAD_AOIS = {}
@@ -435,7 +437,7 @@ def align_and_resize_raster_stack(
     LOGGER.info("aligned all %d rasters.", n_rasters)
 
 
-def clean_it(filename, max_length=250):
+def clean_it(filename, max_length=1000):
     dirname, basename = os.path.split(filename)
     name, ext = os.path.splitext(basename)
 
