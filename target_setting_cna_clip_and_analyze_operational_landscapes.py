@@ -21,10 +21,16 @@ import numpy as np
 import pandas as pd
 import rasterio
 
-from pilot_area_downstream_pop_and_es_summary import create_circular_kernel
-from pilot_area_downstream_pop_and_es_summary import subset_subwatersheds
-from pilot_area_downstream_pop_and_es_summary import calc_flow_dir
-from pilot_area_downstream_pop_and_es_summary import mask_by_nonzero_and_sum
+from pilot_indicators_area_downstream_pop_and_es_summary import (
+    create_circular_kernel,
+)
+from pilot_indicators_area_downstream_pop_and_es_summary import (
+    subset_subwatersheds,
+)
+from pilot_indicators_area_downstream_pop_and_es_summary import calc_flow_dir
+from pilot_indicators_area_downstream_pop_and_es_summary import (
+    mask_by_nonzero_and_sum,
+)
 
 gdal.SetCacheMax(2**27)
 
@@ -41,7 +47,8 @@ logging.getLogger("ecoshard.taskgraph").setLevel(logging.INFO)
 logging.getLogger("rasterio").setLevel(logging.WARNING)
 logging.getLogger("fiona").setLevel(logging.WARNING)
 
-CNA_RASTER_PATH = "./data/A_90_md5_79f5e0d5d5029d90e8f10d5932da93ff.tif"
+CNA_RASTER_PATH = "./data/A_25_md5_737a2625eda959bc0e9c024919e5e7b9.tif"
+# Prod_scapes_EE_wflags is the "operational landscapes"
 PRODSCAPE_VECTOR_PATH = "./data/Prod_scapes_EE_wflags"
 GLOBAL_SUBWATERSHEDS_VECTOR_PATH = "./dem_precondition/data/merged_lev06.shp"
 DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"

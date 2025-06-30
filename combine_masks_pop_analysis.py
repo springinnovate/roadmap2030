@@ -10,12 +10,16 @@ import sys
 from pilot_area_downstream_pop_and_es_summary import (
     align_and_resize_raster_stack,
 )
+from people_within_travel_time import transform_edge_points_eckert_to_wgs84
 from pilot_area_downstream_pop_and_es_summary import clean_it
 from pilot_area_downstream_pop_and_es_summary import mask_by_nonzero_and_sum
 from ecoshard import geoprocessing
 from ecoshard import taskgraph
+from shapely.geometry import box
 from osgeo import gdal
 import pandas as pd
+import geopandas as gpd
+import pyproj
 
 gdal.SetCacheMax(2**27)
 
@@ -93,14 +97,20 @@ def combine_mask_and_sum_pop(
         for path in path_list
     ]
 
-    align_and_resize_raster_stack(
-        path_list,
-        aligned_raster_path_list,
-        ["nearest"] * len(path_list),
-        population_raster_info["pixel_size"],
-        "union",
-        target_projection_wkt=population_raster_info["projection_wkt"],
-    )
+    try:
+        align_and_resize_raster_stack(
+            path_list,
+            aligned_raster_path_list,
+            ["nearest"] * len(path_list),
+            population_raster_info["pixel_size"],
+            "union",
+            target_projection_wkt=population_raster_info["projection_wkt"],
+        )
+    except RuntimeError:
+        LOGGER.exception(
+            f"runtime error on {path_list} using {population_raster_info['projection_wkt']}"
+        )
+        raise
 
     aligned_raster_info = geoprocessing.get_raster_info(aligned_raster_path_list[0])
 
@@ -150,12 +160,54 @@ def combine_mask_and_sum_pop(
     return results
 
 
+def is_eckert_iv_projection(projection_wkt):
+    try:
+        if "eckert_iv" in projection_wkt.lower():
+            return True
+        crs = pyproj.CRS.from_wkt(projection_wkt)
+        return "eckert_iv" in crs.name.lower() or "eckert iv" in crs.name.lower()
+    except pyproj.exceptions.CRSError:
+        return False
+
+
 def main():
     task_graph = taskgraph.TaskGraph(WORKSPACE_DIR, -1)
     population_raster_info = geoprocessing.get_raster_info(POPULATION_RASTER_PATH)
 
     results_by_area_task_list = []
     for prefix, path_list in COMPLETE_SETS.items():
+        # if any raster in path_list is eckert iv then transform it first
+        eckert_reprojection_task_list = []
+        for index, raster_path in enumerate(path_list):
+            raster_path_info = geoprocessing.get_raster_info(raster_path)
+            if is_eckert_iv_projection(raster_path_info["projection_wkt"]):
+                LOGGER.info(f"***** {raster_path} is eckert_iv!!!1")
+                reprojected_raster_path = "%s_wgs84%s" % os.path.splitext(raster_path)
+
+                bbox_gdf = gpd.GeoDataFrame(
+                    {"geometry": [box(*raster_path_info["bounding_box"])]},
+                    crs=raster_path_info["projection_wkt"],
+                )
+
+                target_bb = transform_edge_points_eckert_to_wgs84(
+                    bbox_gdf
+                ).geometry.tolist()
+                print(target_bb)
+                warp_from_eckert_task = task_graph.add_task(
+                    func=geoprocessing.warp_raster,
+                    args=(
+                        raster_path,
+                        population_raster_info["pixel_size"],
+                        reprojected_raster_path,
+                        "nearest",
+                    ),
+                    kwargs={"target_bb": target_bb},
+                    target_path_list=[reprojected_raster_path],
+                    task_name=f"eckert_iv reprojection of {raster_path}",
+                )
+                eckert_reprojection_task_list.append(warp_from_eckert_task)
+                path_list[index] = reprojected_raster_path
+
         pop_count_task = task_graph.add_task(
             func=combine_mask_and_sum_pop,
             args=(
@@ -167,6 +219,7 @@ def main():
             ),
             store_result=True,
             transient_run=True,
+            dependent_task_list=eckert_reprojection_task_list,
             task_name=f"calculate {prefix}",
         )
         results_by_area_task_list.append((prefix, pop_count_task))

@@ -40,9 +40,8 @@ logging.getLogger("fiona").setLevel(logging.WARNING)
 
 
 AOI_DIRS = [
-    # "./data/aoi_by_country",
-    # "./data/WWF-Int_Pilot",
-    "./data/Prod_scapes_EE_wflags",
+    "./data/aoi_by_country",
+    "./data/WWF-Int_Pilot",
 ]
 
 ANALYSIS_AOIS = {}
