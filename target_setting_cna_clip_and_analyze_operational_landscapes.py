@@ -47,9 +47,13 @@ logging.getLogger("ecoshard.taskgraph").setLevel(logging.INFO)
 logging.getLogger("rasterio").setLevel(logging.WARNING)
 logging.getLogger("fiona").setLevel(logging.WARNING)
 
-CNA_RASTER_PATH = "./data/A_25_md5_737a2625eda959bc0e9c024919e5e7b9.tif"
+CNA_RASTER_PATH_DICT = {
+    "A_25": "./data/A_25_md5_737a2625eda959bc0e9c024919e5e7b9.tif",
+    "A_50": "./data/A_50_md5_e26abccbc56f1188e269458fe427073f.tif",
+    "A_90": "./data/A_90_md5_79f5e0d5d5029d90e8f10d5932da93ff.tif",
+}
 # Prod_scapes_EE_wflags is the "operational landscapes"
-PRODSCAPE_VECTOR_PATH = "./data/Prod_scapes_EE_wflags"
+PRODSCAPE_VECTOR_PATH = "./data/Prod_scapes_EE_wflags/Prod_scapes_EE_wflags_fixed.gpkg"
 GLOBAL_SUBWATERSHEDS_VECTOR_PATH = "./dem_precondition/data/merged_lev06.shp"
 DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"
 
@@ -112,14 +116,55 @@ def warp_to_match(
 
 
 def main():
-    # reproject Prod_scapes_EE to CNA_RASTER_PATH
-    # mask out CNA by prodscape vector
     LOGGER.info("starting")
     task_graph = taskgraph.TaskGraph(WORKSPACE_DIR, 4, 10.0)
 
-    cna_raster_info = geoprocessing.get_raster_info(CNA_RASTER_PATH)
+    zonal_stats_task_dict = {}
+    for cna_label, cna_raster_path in CNA_RASTER_PATH_DICT.items():
+        zonal_stats_task, mask_by_nonzero_task = process_cna_raster(
+            cna_label, task_graph, cna_raster_path
+        )
+        zonal_stats_task_dict[cna_label] = (
+            zonal_stats_task,
+            mask_by_nonzero_task,
+        )
+
+    df_final = None
+    for cna_label, (
+        zonal_stats_task,
+        mask_by_nonzero_task,
+    ) in zonal_stats_task_dict.items():
+        results_by_country = zonal_stats_task.get()
+        results_by_country.insert(
+            0, {"country": "ALL", "pop sum": mask_by_nonzero_task.get()}
+        )
+
+        temp_df = pd.DataFrame(results_by_country)
+
+        # Rename pop sum column with cna_label
+        temp_df = temp_df.rename(columns={"pop sum": f"pop sum_{cna_label}"})
+
+        if df_final is None:
+            df_final = temp_df
+        else:
+            # Merge on 'country' column to ensure correct alignment
+            df_final = pd.merge(df_final, temp_df, on="country", how="outer")
+    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    table_path = f"CNA_pop_by_country_{timestamp}.csv"
+    df_final.to_csv(table_path, index=False)
+    LOGGER.info(f"result at {table_path}")
+
+    task_graph.join()
+    task_graph.close()
+
+
+def process_cna_raster(job_id, task_graph, cna_raster_path):
+    # reproject Prod_scapes_EE to cna_raster_path
+    # mask out CNA by prodscape vector
+
+    cna_raster_info = geoprocessing.get_raster_info(cna_raster_path)
     target_projected_prodscape_vector_path = os.path.join(
-        WORKSPACE_DIR, "projected_prodscape_vector.gpkg"
+        WORKSPACE_DIR, f"{job_id}_projected_prodscape_vector.gpkg"
     )
     reproject_prodscape_task = task_graph.add_task(
         func=geoprocessing.reproject_vector,
@@ -128,13 +173,16 @@ def main():
             cna_raster_info["projection_wkt"],
             target_projected_prodscape_vector_path,
         ),
-        ignore_path_list=[target_projected_prodscape_vector_path],
+        ignore_path_list=[
+            PRODSCAPE_VECTOR_PATH,
+            target_projected_prodscape_vector_path,
+        ],
         target_path_list=[target_projected_prodscape_vector_path],
         task_name=f"reproject {PRODSCAPE_VECTOR_PATH}",
     )
 
     target_projected_subwatershed_vector_path = os.path.join(
-        WORKSPACE_DIR, "projected_subwatersheds_vector.gpkg"
+        WORKSPACE_DIR, f"{job_id}_projected_subwatersheds_vector.gpkg"
     )
     reproject_subwatershed_task = task_graph.add_task(
         func=geoprocessing.reproject_vector,
@@ -143,28 +191,31 @@ def main():
             cna_raster_info["projection_wkt"],
             target_projected_subwatershed_vector_path,
         ),
-        ignore_path_list=[target_projected_subwatershed_vector_path],
+        ignore_path_list=[
+            GLOBAL_SUBWATERSHEDS_VECTOR_PATH,
+            target_projected_subwatershed_vector_path,
+        ],
         target_path_list=[target_projected_subwatershed_vector_path],
         task_name=f"reproject {GLOBAL_SUBWATERSHEDS_VECTOR_PATH}",
     )
 
     target_masked_cna_raster_path = os.path.join(
-        WORKSPACE_DIR, f"masked_{os.path.basename(CNA_RASTER_PATH)}"
+        WORKSPACE_DIR, f"{job_id}_masked_{os.path.basename(cna_raster_path)}"
     )
     mask_cna_raster_task = task_graph.add_task(
         func=geoprocessing.mask_raster,
         args=(
-            (CNA_RASTER_PATH, 1),
+            (cna_raster_path, 1),
             target_projected_prodscape_vector_path,
             target_masked_cna_raster_path,
         ),
         dependent_task_list=[reproject_prodscape_task],
         target_path_list=[target_masked_cna_raster_path],
-        task_name=f"mask out {CNA_RASTER_PATH}",
+        task_name=f"mask out {cna_raster_path}",
     )
 
     downstream_subwatershed_vector_path = os.path.join(
-        WORKSPACE_DIR, "downstream_subwatersheds.gpkg"
+        WORKSPACE_DIR, f"{job_id}_downstream_subwatersheds.gpkg"
     )
     downstream_subwatershed_task = task_graph.add_task(
         func=subset_subwatersheds,
@@ -186,12 +237,12 @@ def main():
         task_name=f"subset {downstream_subwatershed_vector_path}",
     )
     target_clipped_dem_path = os.path.join(
-        WORKSPACE_DIR, f"clipped_{os.path.basename(DEM_RASTER_PATH)}"
+        WORKSPACE_DIR, f"{job_id}_clipped_{os.path.basename(DEM_RASTER_PATH)}"
     )
-    target_flow_dir_path = os.path.join(WORKSPACE_DIR, "flow_dir.tif")
+    target_flow_dir_path = os.path.join(WORKSPACE_DIR, f"{job_id}_flow_dir.tif")
 
     dem_projected_downstream_subwatershed_vector_path = os.path.join(
-        WORKSPACE_DIR, "dem_projected_downstream_subwatershed.gpkg"
+        WORKSPACE_DIR, f"{job_id}_dem_projected_downstream_subwatershed.gpkg"
     )
 
     dem_raster_info = geoprocessing.get_raster_info(DEM_RASTER_PATH)
@@ -211,7 +262,7 @@ def main():
     flow_dir_task = task_graph.add_task(
         func=calc_flow_dir,
         args=(
-            "prodscape_cna",
+            f"prodscape_cna_{job_id}",
             DEM_RASTER_PATH,
             dem_projected_downstream_subwatershed_vector_path,
             target_clipped_dem_path,
@@ -228,7 +279,7 @@ def main():
 
     warped_masked_cna_raster_path = os.path.join(
         WORKSPACE_DIR,
-        f"warped_{os.path.basename(target_masked_cna_raster_path)}",
+        f"{job_id}_warped_{os.path.basename(target_masked_cna_raster_path)}",
     )
     warp_cna_task = task_graph.add_task(
         func=warp_to_match,
@@ -243,7 +294,7 @@ def main():
     )
 
     aoi_downstream_flow_mask_path = os.path.join(
-        WORKSPACE_DIR, f"aoi_ds_coverage_{BUFFER_SIZE_IN_M}m.tif"
+        WORKSPACE_DIR, f"{job_id}_aoi_ds_coverage_{BUFFER_SIZE_IN_M}m.tif"
     )
     flow_accum_task = task_graph.add_task(
         func=routing.flow_accumulation_mfd,
@@ -265,7 +316,7 @@ def main():
     # within buffer_size_in_px from the center
     # dimensions should be
     #    buffer_size_in_px*2+1 X buffer_size_in_px*2+1
-    kernel_path = os.path.join(WORKSPACE_DIR, f"kernel_{BUFFER_SIZE_IN_M}.tif")
+    kernel_path = os.path.join(WORKSPACE_DIR, f"{job_id}_kernel_{BUFFER_SIZE_IN_M}.tif")
     kernel_task = task_graph.add_task(
         func=create_circular_kernel,
         args=(kernel_path, BUFFER_SIZE_IN_PX),
@@ -288,7 +339,7 @@ def main():
 
     masked_population_raster_path = os.path.join(
         WORKSPACE_DIR,
-        f"cna_pop_downstream_of_prod_{BUFFER_SIZE_IN_M}m.tif",
+        f"{job_id}_cna_pop_downstream_of_prod_{BUFFER_SIZE_IN_M}m.tif",
     )
     mask_by_nonzero_task = task_graph.add_task(
         func=mask_by_nonzero_and_sum,
@@ -316,23 +367,12 @@ def main():
         task_name="calc raster stats by country",
     )
 
-    task_graph.join()
-    task_graph.close()
-    results_by_country = zonal_stats_task.get()
-    results_by_country.insert(
-        0, {"country": "ALL", "pop sum": mask_by_nonzero_task.get()}
-    )
-    df = pd.DataFrame(results_by_country)
-    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    table_path = f"CNA_pop_by_country_{timestamp}.csv"
-    df.to_csv(table_path, index=False)
-    LOGGER.info(f"total sum is: {mask_by_nonzero_task.get()}")
-    LOGGER.info(f"result at {table_path}")
     LOGGER.info(
         f"\n{target_masked_cna_raster_path} -- CNA raster masked by prodscapes"
         f"\n{aoi_downstream_flow_mask_path} -- areas downstream of the CNA masked prodscapes (any positive value is downstream)"
         f"\n{masked_population_raster_path} -- population masked by the downstream areas of the CNA masked by prodcsapes (values are people counts per pixel)"
     )
+    return zonal_stats_task, mask_by_nonzero_task
 
 
 def zonal_stats(base_raster_path, vector_path, field_name):
