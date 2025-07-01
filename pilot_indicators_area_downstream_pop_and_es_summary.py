@@ -14,6 +14,7 @@ import logging
 import os
 import sys
 import tempfile
+from itertools import islice
 
 from ecoshard.geoprocessing.geoprocessing_core import (
     DEFAULT_GTIFF_CREATION_TUPLE_OPTIONS,
@@ -28,9 +29,11 @@ from shapely.geometry import shape
 from shapely.ops import transform
 import fiona
 import geopandas as gpd
+import pandas as pd
 import numpy as np
 import pyproj
 import rasterio
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -631,100 +634,172 @@ def create_circular_kernel(kernel_path, buffer_size_in_px):
     out_raster = None
 
 
+def _chunks(iterable, size):
+    it = iter(iterable)
+    return iter(lambda: list(islice(it, size)), [])
+
+
 def subset_subwatersheds(
     aoi_vector_path, subwatershed_vector_path, subset_subwatersheds_vector_path
 ):
-    # Prepare AOI
-    aoi_vector = gpd.read_file(aoi_vector_path)
-    aoi_vector.geometry = aoi_vector.geometry.buffer(0)
-    aoi_crs = aoi_vector.crs
-    aoi_union = aoi_vector.geometry.union_all()
-    aoi_bbox_geom = box(*aoi_vector.total_bounds)
+    LOGGER.info(f"processing aoi {aoi_vector_path}")
+    aoi_gdf = gpd.read_file(aoi_vector_path)
+    aoi_gdf["geometry"] = aoi_gdf["geometry"].buffer(0)
+    aoi_union = aoi_gdf.unary_union
+    aoi_bbox = box(*aoi_gdf.total_bounds)
+    aoi_crs = aoi_gdf.crs
 
-    # Retrieve subwatershed CRS
-    with fiona.open(subwatershed_vector_path, "r") as subwatershed_vector:
-        subwatershed_crs = subwatershed_vector.crs
-
-    if aoi_crs != subwatershed_crs:
-        transformer = pyproj.Transformer.from_crs(
-            aoi_crs, subwatershed_crs, always_xy=True
-        ).transform
-        aoi_bbox_geom = transform(transformer, aoi_bbox_geom)
-
-    # Initial filter based on bbox for fast lookup, then slower geometry
-    # itersection
-    subwatershed_filtered = gpd.read_file(
-        subwatershed_vector_path, bbox=aoi_bbox_geom.bounds
-    )
-    initial_subwatersheds = subwatershed_filtered[
-        subwatershed_filtered.intersects(aoi_union)
-    ]
-
-    all_hybas_ids = set(initial_subwatersheds["HYBAS_ID"])
-    downstream_ids = set(initial_subwatersheds["NEXT_DOWN"]) - {0}
-
-    # Create lookup of ID -> NEXT_DOWN
+    LOGGER.info(f"Sub‑watershed CRS & ID ->NEXT mapping  {aoi_vector_path}")
     with fiona.open(subwatershed_vector_path, "r") as src:
+        sub_crs = src.crs
+        layer_name = src.name
         hybas_to_nextdown = {
             f["properties"]["HYBAS_ID"]: f["properties"]["NEXT_DOWN"] for f in src
         }
 
-    # breadth first graph walk to pick up all the ids
-    while downstream_ids:
-        all_hybas_ids.update(downstream_ids)
-        downstream_ids = (
-            {
-                hybas_to_nextdown[hybas_id]
-                for hybas_id in downstream_ids
-                if hybas_id in hybas_to_nextdown
-            }
-            - all_hybas_ids
+    LOGGER.info(f"Reproject AOI to sub‑watershed CRS {aoi_vector_path}")
+    if aoi_crs != sub_crs:
+        tform = pyproj.Transformer.from_crs(aoi_crs, sub_crs, always_xy=True).transform
+        aoi_bbox = transform(tform, aoi_bbox)
+        aoi_union = transform(tform, aoi_union)
+
+    LOGGER.info(f"Fast spatial pre-filter {aoi_vector_path}")
+    sub_bbox_gdf = gpd.read_file(subwatershed_vector_path, bbox=aoi_bbox.bounds)
+    hits = sub_bbox_gdf.sindex.query(aoi_union, predicate="intersects")
+    initial = sub_bbox_gdf.iloc[hits]
+
+    LOGGER.info(f"Downstream BFS {aoi_vector_path}")
+    all_ids = set(initial["HYBAS_ID"])
+    queue = set(initial["NEXT_DOWN"]) - {0}
+    while queue:
+        all_ids.update(queue)
+        queue = (
+            {hybas_to_nextdown.get(hid) for hid in queue if hid in hybas_to_nextdown}
+            - all_ids
             - {0}
         )
 
-    # Load all relevant subwatersheds in one go
-    with fiona.open(subwatershed_vector_path, "r") as subwatershed_vector:
-        fetched_subwatersheds = []
-        for f in subwatershed_vector:
-            if f["properties"]["HYBAS_ID"] in all_hybas_ids:
-                geom = f.get("geometry")
-                # there's a lot of double checking I do here because some of
-                # the geometries we get seem to be None or have some other
-                # invalid values?
-                if geom is None:
-                    continue  # Skip features with no geometry at all
-                shapely_geom = shape(geom)
-                if shapely_geom.is_empty:
-                    continue  # Skip empty geometries
-                fetched_subwatersheds.append(f)
-
-    # Explicit guard to handle empty geometries clearly
-    if not fetched_subwatersheds:
-        LOGGER.warning(
-            f"No valid geometry found in fetched subwatersheds for AOI {aoi_vector_path}. "
-            f"Creating an empty GeoDataFrame."
+    if not all_ids:
+        gpd.GeoDataFrame({"geometry": []}, crs=aoi_crs).to_file(
+            subset_subwatersheds_vector_path, driver="GPKG"
         )
+        LOGGER.warning("No valid geometry found; wrote empty GPKG.")
+        return
 
-        # Create a valid but empty GeoDataFrame with the correct CRS and columns
-        all_subwatersheds_gdf = gpd.GeoDataFrame({"geometry": []}, crs=subwatershed_crs)
+    LOGGER.info(f"Fetch geometries with attribute SQL {aoi_vector_path}")
+    gdf_parts = []
+    for id_chunk in _chunks(all_ids, 1000):
+        id_list = ",".join(map(str, id_chunk))
+        sql = f'SELECT * FROM "{layer_name}" WHERE HYBAS_ID IN ({id_list})'
+        gdf_parts.append(gpd.read_file(subwatershed_vector_path, sql=sql))
+    sub_gdf = gpd.GeoDataFrame(pd.concat(gdf_parts, ignore_index=True), crs=sub_crs)
 
-        if subwatershed_crs != aoi_crs:
-            all_subwatersheds_gdf = all_subwatersheds_gdf.to_crs(aoi_crs)
+    LOGGER.info(f"Repair only invalid geometries {aoi_vector_path}")
+    invalid = ~sub_gdf.geometry.is_valid
+    if invalid.any():
+        sub_gdf.loc[invalid, "geometry"] = sub_gdf.loc[invalid, "geometry"].buffer(0)
 
-        all_subwatersheds_gdf.to_file(subset_subwatersheds_vector_path, driver="GPKG")
-        return  # gracefully exit after writing empty GPKG
+    LOGGER.info(f"Reproject to AOI CRS & write {aoi_vector_path}")
+    if sub_crs != aoi_crs:
+        sub_gdf = sub_gdf.to_crs(aoi_crs)
+    sub_gdf.to_file(subset_subwatersheds_vector_path, driver="GPKG")
+    LOGGER.info(f"all done subwatershedding {aoi_vector_path}")
 
-    # Continue with existing logic if valid geometries exist
-    all_subwatersheds_gdf = gpd.GeoDataFrame.from_features(
-        fetched_subwatersheds, crs=subwatershed_crs
-    )
 
-    all_subwatersheds_gdf.geometry = all_subwatersheds_gdf.geometry.buffer(0)
+# def subset_subwatersheds(
+#     aoi_vector_path, subwatershed_vector_path, subset_subwatersheds_vector_path
+# ):
+#     # Prepare AOI
+#     aoi_vector = gpd.read_file(aoi_vector_path)
+#     aoi_vector.geometry = aoi_vector.geometry.buffer(0)
+#     aoi_crs = aoi_vector.crs
+#     aoi_union = aoi_vector.geometry.union_all()
+#     aoi_bbox_geom = box(*aoi_vector.total_bounds)
 
-    if subwatershed_crs != aoi_crs:
-        all_subwatersheds_gdf = all_subwatersheds_gdf.to_crs(aoi_crs)
+#     # Retrieve subwatershed CRS
+#     with fiona.open(subwatershed_vector_path, "r") as subwatershed_vector:
+#         subwatershed_crs = subwatershed_vector.crs
 
-    all_subwatersheds_gdf.to_file(subset_subwatersheds_vector_path, driver="GPKG")
+#     if aoi_crs != subwatershed_crs:
+#         transformer = pyproj.Transformer.from_crs(
+#             aoi_crs, subwatershed_crs, always_xy=True
+#         ).transform
+#         aoi_bbox_geom = transform(transformer, aoi_bbox_geom)
+
+#     # Initial filter based on bbox for fast lookup, then slower geometry
+#     # itersection
+#     subwatershed_filtered = gpd.read_file(
+#         subwatershed_vector_path, bbox=aoi_bbox_geom.bounds
+#     )
+#     initial_subwatersheds = subwatershed_filtered[
+#         subwatershed_filtered.intersects(aoi_union)
+#     ]
+
+#     all_hybas_ids = set(initial_subwatersheds["HYBAS_ID"])
+#     downstream_ids = set(initial_subwatersheds["NEXT_DOWN"]) - {0}
+
+#     # Create lookup of ID -> NEXT_DOWN
+#     with fiona.open(subwatershed_vector_path, "r") as src:
+#         hybas_to_nextdown = {
+#             f["properties"]["HYBAS_ID"]: f["properties"]["NEXT_DOWN"] for f in src
+#         }
+
+#     # breadth first graph walk to pick up all the ids
+#     while downstream_ids:
+#         all_hybas_ids.update(downstream_ids)
+#         downstream_ids = (
+#             {
+#                 hybas_to_nextdown[hybas_id]
+#                 for hybas_id in downstream_ids
+#                 if hybas_id in hybas_to_nextdown
+#             }
+#             - all_hybas_ids
+#             - {0}
+#         )
+
+#     # Load all relevant subwatersheds in one go
+#     with fiona.open(subwatershed_vector_path, "r") as subwatershed_vector:
+#         fetched_subwatersheds = []
+#         for f in subwatershed_vector:
+#             if f["properties"]["HYBAS_ID"] in all_hybas_ids:
+#                 geom = f.get("geometry")
+#                 # there's a lot of double checking I do here because some of
+#                 # the geometries we get seem to be None or have some other
+#                 # invalid values?
+#                 if geom is None:
+#                     continue  # Skip features with no geometry at all
+#                 shapely_geom = shape(geom)
+#                 if shapely_geom.is_empty:
+#                     continue  # Skip empty geometries
+#                 fetched_subwatersheds.append(f)
+
+#     # Explicit guard to handle empty geometries clearly
+#     if not fetched_subwatersheds:
+#         LOGGER.warning(
+#             f"No valid geometry found in fetched subwatersheds for AOI {aoi_vector_path}. "
+#             f"Creating an empty GeoDataFrame."
+#         )
+
+#         # Create a valid but empty GeoDataFrame with the correct CRS and columns
+#         all_subwatersheds_gdf = gpd.GeoDataFrame({"geometry": []}, crs=subwatershed_crs)
+
+#         if subwatershed_crs != aoi_crs:
+#             all_subwatersheds_gdf = all_subwatersheds_gdf.to_crs(aoi_crs)
+
+#         all_subwatersheds_gdf.to_file(subset_subwatersheds_vector_path, driver="GPKG")
+#         return  # gracefully exit after writing empty GPKG
+
+#     # Continue with existing logic if valid geometries exist
+#     all_subwatersheds_gdf = gpd.GeoDataFrame.from_features(
+#         fetched_subwatersheds, crs=subwatershed_crs
+#     )
+
+#     all_subwatersheds_gdf.geometry = all_subwatersheds_gdf.geometry.buffer(0)
+
+#     if subwatershed_crs != aoi_crs:
+#         all_subwatersheds_gdf = all_subwatersheds_gdf.to_crs(aoi_crs)
+
+#     all_subwatersheds_gdf.to_file(subset_subwatersheds_vector_path, driver="GPKG")
 
 
 MASKED_SET = set()

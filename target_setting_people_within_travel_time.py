@@ -1,7 +1,6 @@
 """Distance to habitat with a friction layer."""
 
 from datetime import datetime
-import glob
 import logging
 import os
 import sys
@@ -13,16 +12,25 @@ from pyproj import CRS
 from pyproj import Transformer
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from shapely.geometry import box
-from shapely.geometry import shape
-import fiona
+from shapely.ops import transform as shapely_transform
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import psutil
 import rasterio
-import rasterio.mask
-
 import shortest_distances
+from rasterio.transform import from_bounds
+
+GTIFF_CREATION_TUPLE_OPTIONS = (
+    "GTIFF",
+    (
+        "TILED=YES",
+        "BIGTIFF=YES",
+        "COMPRESS=LZW",
+        "BLOCKXSIZE=256",
+        "BLOCKYSIZE=256",
+    ),
+)
 
 gdal.SetCacheMax(2**27)
 
@@ -46,11 +54,11 @@ MASK_RASTER_PATH_DICT = {
         "A_25_masked_A_25_md5_737a2625eda959bc0e9c024919e5e7b9.tif",
     ),
     "A_50": os.path.join(
-        "worksapce_clip_and_analyze_CNA",
+        "workspace_clip_and_analyze_CNA",
         "A_50_masked_A_50_md5_e26abccbc56f1188e269458fe427073f.tif",
     ),
     "A_90": os.path.join(
-        "worksapce_clip_and_analyze_CNA",
+        "workspace_clip_and_analyze_CNA",
         "A_90_masked_A_90_md5_79f5e0d5d5029d90e8f10d5932da93ff.tif",
     ),
 }
@@ -107,19 +115,50 @@ def transform_bbox(bbox_geom, src_wkt, dst_wkt):
     )
 
 
-def clip_raster(src_path, bbox_geom, dst_path):
+# def clip_raster(src_path, bbox_geom, dst_path):
+def reproject_and_pad_raster(
+    src_path, bbox_geom, dst_path, resolution=None, dst_crs=None, nodata=None
+):
     with rasterio.open(src_path) as src:
-        out_image, out_transform = mask(src, [mapping(bbox_geom)], crop=True)
-        meta = src.meta.copy()
-        meta.update(
+        src_crs = src.crs
+        dst_crs = dst_crs if dst_crs else src_crs
+
+        minx, miny, maxx, maxy = bbox_geom.bounds
+
+        # Set resolution to source resolution if not specified
+        resolution = resolution if resolution else (src.res[0], src.res[1])
+
+        # Calculate dimensions explicitly
+        width = int((maxx - minx) / resolution[0])
+        height = int((maxy - miny) / resolution[1])
+
+        dst_transform = from_bounds(minx, miny, maxx, maxy, width, height)
+
+        # Prepare metadata for the destination raster
+        dst_meta = src.meta.copy()
+        dst_meta.update(
             {
-                "height": out_image.shape[1],
-                "width": out_image.shape[2],
-                "transform": out_transform,
+                "crs": dst_crs,
+                "transform": dst_transform,
+                "width": width,
+                "height": height,
+                "nodata": nodata if nodata is not None else src.nodata,
             }
         )
-        with rasterio.open(dst_path, "w", **meta) as dst:
-            dst.write(out_image)
+
+        # Create destination raster and explicitly reproject/pad
+        with rasterio.open(dst_path, "w", **dst_meta) as dst:
+            for i in range(1, src.count + 1):
+                reproject(
+                    source=rasterio.band(src, i),
+                    destination=rasterio.band(dst, i),
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=dst_transform,
+                    dst_crs=dst_crs,
+                    resampling=Resampling.nearest,
+                    dst_nodata=dst_meta["nodata"],
+                )
 
 
 def reproject_raster(src_path, dst_path, dst_crs, dst_res):
@@ -172,62 +211,75 @@ def process_raster_mask(mask_id, mask_raster_path, max_hours, workspace_dir):
     )
 
     mask_info = geoprocessing.get_raster_info(mask_raster_path)
-    friction_info = geoprocessing.get_raster_info(FRICTION_SURFACE_RASTER_PATH)
 
     # 1. Clip friction raster (native CRS)
-    friction_bbox = transform_bbox(
-        buffered_bbox,
-        mask_info["projection_wkt"],
-        friction_info["projection_wkt"],
+    # friction_bbox = transform_bbox(
+    #     buffered_bbox,
+    #     mask_info["projection_wkt"],
+    #     friction_info["projection_wkt"],
+    # )
+    # eckert to lat/lng always breaks, just use this
+    friction_reprojected_raster_path = os.path.join(
+        local_workspace_dir, "friction_reprojected.tif"
     )
-    friction_clipped_raster_path = os.path.join(
-        local_workspace_dir, "friction_clipped.tif"
-    )
-    clip_raster(
+    geoprocessing.warp_raster(
         FRICTION_SURFACE_RASTER_PATH,
-        friction_bbox,
-        friction_clipped_raster_path,
+        mask_info["pixel_size"],
+        friction_reprojected_raster_path,
+        "nearest",
+        target_bb=buffered_bbox.bounds,
+        target_projection_wkt=mask_info["projection_wkt"],
+        raster_driver_creation_tuple=GTIFF_CREATION_TUPLE_OPTIONS,
     )
 
     # 2. Clip mask raster then reproject to friction CRS
-    mask_clipped = os.path.join(local_workspace_dir, "mask_clipped.tif")
-    clip_raster(mask_raster_path, buffered_bbox, mask_clipped)
     mask_reprojected_raster_path = os.path.join(
         local_workspace_dir, "mask_reprojected.tif"
     )
-    reproject_raster(
-        mask_clipped,
+    geoprocessing.warp_raster(
+        mask_raster_path,
+        mask_info["pixel_size"],
         mask_reprojected_raster_path,
-        friction_info["projection_wkt"],
-        friction_info["pixel_size"],
+        "nearest",
+        target_bb=buffered_bbox.bounds,
+        target_projection_wkt=mask_info["projection_wkt"],
+        raster_driver_creation_tuple=GTIFF_CREATION_TUPLE_OPTIONS,
     )
 
     # 3. Clip population raster then reproject to friction CRS
-    pop_clipped = os.path.join(local_workspace_dir, "population_clipped.tif")
-    clip_raster(POPULATION_RASTER_PATH, buffered_bbox, pop_clipped)
     pop_reprojected_raster_path = os.path.join(
         local_workspace_dir, "population_reprojected.tif"
     )
-    reproject_raster(
-        pop_clipped,
+    geoprocessing.warp_raster(
+        POPULATION_RASTER_PATH,
+        mask_info["pixel_size"],
         pop_reprojected_raster_path,
-        friction_info["projection_wkt"],
-        friction_info["pixel_size"],
+        "nearest",
+        target_bb=buffered_bbox.bounds,
+        target_projection_wkt=mask_info["projection_wkt"],
+        raster_driver_creation_tuple=GTIFF_CREATION_TUPLE_OPTIONS,
     )
 
     LOGGER.info(f"Completed processing for mask: {mask_id}")
 
     LOGGER.info(f"{mask_id}: Reading friction surface raster")
-    with rasterio.open(friction_clipped_raster_path) as friction_ds:
+    with rasterio.open(friction_reprojected_raster_path) as friction_ds:
         friction_array = friction_ds.read(1)
         transform = friction_ds.transform
         cell_length_m = transform.a
         n_rows, n_cols = friction_array.shape
 
-    with rasterio.open(mask_raster_path) as src:
+    with rasterio.open(mask_reprojected_raster_path) as src:
         mask_array = src.read(1)
 
-    binary_mask = (mask_array > 1).astype("uint8")
+    binary_mask = (mask_array >= 1).astype("int8")
+
+    LOGGER.info(friction_array.shape)
+    LOGGER.info(binary_mask.shape)
+    LOGGER.info(cell_length_m)
+    LOGGER.info(n_cols)
+    LOGGER.info(n_rows)
+    LOGGER.info(max_time_mins)
 
     travel_reach_array = shortest_distances.find_mask_reach(
         friction_array,
@@ -249,7 +301,7 @@ def process_raster_mask(mask_id, mask_raster_path, max_hours, workspace_dir):
         f"{mask_id}: Writing travel reach raster to {target_max_reach_raster_path}"
     )
 
-    with rasterio.open(friction_clipped_raster_path) as tpl_ds:
+    with rasterio.open(friction_reprojected_raster_path) as tpl_ds:
         reach_meta = tpl_ds.meta.copy()
         reach_meta.update({"dtype": travel_reach_array.dtype, "count": 1, "nodata": 0})
 
@@ -283,13 +335,13 @@ def main():
                 args=(mask_id, mask_raster_path, max_hours, WORKSPACE_DIR),
                 store_result=True,
                 transient_run=True,
-                task_name=f"process {aoi_basename} at {max_hours} hours",
+                task_name=f"process {mask_id} at {max_hours} hours",
             )
-            task_list.append((aoi_basename, max_hours, in_range_pop_count_task))
-    for aoi_basename, max_hours, in_range_pop_count_task in task_list:
-        if aoi_basename not in results_dict:
-            results_dict[aoi_basename] = {}
-        results_dict[aoi_basename][max_hours] = in_range_pop_count_task.get()
+            task_list.append((mask_id, max_hours, in_range_pop_count_task))
+    for mask_id, max_hours, in_range_pop_count_task in task_list:
+        if mask_id not in results_dict:
+            results_dict[mask_id] = {}
+        results_dict[mask_id][max_hours] = in_range_pop_count_task.get()
 
     df = pd.DataFrame(results_dict).T.sort_index(axis=0)
     df = df.sort_index(axis=1)
