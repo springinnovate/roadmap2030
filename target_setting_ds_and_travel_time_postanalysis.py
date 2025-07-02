@@ -36,13 +36,15 @@ MASK_RASTER_DICT = {
     "A_25_60m_traveltime": "./workspace_target_setting_dist_to_hab_with_friction/A_25/A_25_max_reach_60min.tif",
     "A_50_60m_traveltime": "./workspace_target_setting_dist_to_hab_with_friction/A_50/A_50_max_reach_60min.tif",
     "A_90_60m_traveltime": "./workspace_target_setting_dist_to_hab_with_friction/A_90/A_90_max_reach_60min.tif",
-    "CNA_downstream": "./workspace_downstream_es_analysis/Prod_scapes_EE_wflags_fixed/Prod_scapes_EE_wflags_fixed_aoi_ds_coverage_1000m.tif",
+    "A_25_ds_coverage": "./workspace_clip_and_analyze_CNA/A_25_aoi_ds_coverage_1000m_1000m.tif",
+    "A_50_ds_coverage": "./workspace_clip_and_analyze_CNA/A_50_aoi_ds_coverage_1000m_1000m.tif",
+    "A_90_ds_coverage": "./workspace_clip_and_analyze_CNA/A_90_aoi_ds_coverage_1000m_1000m.tif",
 }
 
 COMBINE_PAIRS = [
-    ("CNA_downstream", "A_25_60m_traveltime"),
-    ("CNA_downstream", "A_50_60m_traveltime"),
-    ("CNA_downstream", "A_90_60m_traveltime"),
+    ("A_25_ds_coverage", "A_25_60m_traveltime"),
+    ("A_50_ds_coverage", "A_50_60m_traveltime"),
+    ("A_90_ds_coverage", "A_90_60m_traveltime"),
 ]
 
 POPULATION_RASTER_PATH = "./data/pop_rasters/landscan-global-2023.tif"
@@ -56,11 +58,11 @@ COUNTRY_NAME_FIELD_ID = "iso3"
 
 
 def _mask_op(value_array, mask_array):
-    return numpy.where(mask_array >= 1, value_array, 0)
+    return numpy.where(mask_array > 0, value_array, 0)
 
 
 def _merge_mask_op(mask_a, mask_b):
-    return (mask_a >= 1) | (mask_b >= 1)
+    return (mask_a > 0) | (mask_b > 0)
 
 
 def main():
@@ -190,7 +192,10 @@ def main():
 
     # put the 'ALL' row first
     df = pd.concat(
-        [df[df["country name"] == "ALL"], df[df["country name"] != "ALL"]],
+        [
+            df[df["country name"] == "ALL"],
+            df[df["country name"] != "ALL"].sort_values("country name"),
+        ],
         ignore_index=True,
     )
 

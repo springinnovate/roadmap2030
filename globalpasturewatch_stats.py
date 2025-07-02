@@ -33,6 +33,8 @@ AOI_PATH, AOI_NAME_KEY = (
     # "Sublandsca",
     r"D:\repositories\data_platform\Conservation_Activities\SOKNOT\SOKNOT_ProjectAreas.gpkg",
     "Name",
+    # r"D:\repositories\data_platform\Conservation_Activities\SOKNOT\SOKNOT_ProjectAreas_outsidePCAs.gpkg",
+    # "Name",
 )
 
 

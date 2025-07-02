@@ -27,7 +27,7 @@ logging.getLogger("fiona").setLevel(logging.WARN)
 
 # DEM_PATH = r"D:/repositories/downstream-beneficiaries/workspace/global_dem_3s_md5_22d0c3809af491fa09d03002bdf09748/global_dem_3s"
 
-AOI_PATH = r"D:\repositories\roadmap2030\data\aois\SOKNOT_landscapes.gpkg"
+AOI_PATH = r"D:\repositories\data_platform\Conservation_Activities\SOKNOT\SOKNOT_PCAs.gpkg" #"D:\repositories\roadmap2030\data\aois\SOKNOT_landscapes.gpkg"
 
 PERCENTILES_LIST = [10, 25, 75, 90]
 
@@ -35,10 +35,16 @@ PERCENTILES_LIST = [10, 25, 75, 90]
 THRESHOLD_AREA_LIST = [0.9]
 
 BASE_RASTER_LOOKUP = {
+    #These have multi-bands -- use "D:\repositories\roadmap2030\summarize_aois_by_eii.py"
+    'eii2000': r"D:\repositories\data_platform\Nature\eii_soknot\eii_soknot_ts_2000.tif"
+    'eii2005': r"D:\repositories\data_platform\Nature\eii_soknot\eii_soknot_ts_2005.tif"
+    'eii2010': r"D:\repositories\data_platform\Nature\eii_soknot\eii_soknot_ts_2010.tif"
+    'eii2015': r"D:\repositories\data_platform\Nature\eii_soknot\eii_soknot_ts_2015.tif"
+    'eii2020': r"D:\repositories\data_platform\Nature\eii_soknot\eii_soknot_ts_2020.tif"
     #'lspop2019': r"D:\repositories\roadmap2030\data/pop_rasters/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif",
     #'floodpop': r"D:\repositories\roadmap2030\data/pop_rasters/floodplains_masked_pop_30s_md5_c027686bb9a9a36bdababbe8af35d696.tif",
     #'lspop2023': r"D:\repositories\roadmap2030\data\pop_rasters\landscan-global-2023.tif",
-    "eii": r"D:\repositories\data_platform\Nature\eii_padj_v5140524_epsg_3395.tif",
+    #"eii": r"D:\repositories\data_platform\Nature\eii_padj_v5140524_epsg_3395.tif",
     #'sed_export_change': r"D:\repositories\roadmap2030\data\ndv_0.0_sed_export_marineESA_2020-1992_change_md5_0ab0cf.tif",
     ##'cv_habitat_change': r"D:\repositories\roadmap2030\data\ndv_0.0_cv_habitat_value_marESA2020-1992_change_md5_1643a7.tif",
     #'n_export_change': r"D:\repositories\roadmap2030\data\ndv_0.0_n_export_marineESA_2020-1992_change_val_md5_18a2b3.tif",
@@ -317,10 +323,10 @@ VECTOR_PATH_LOOKUP = {
     #'313': r"D:\repositories\roadmap2030\data\aois\final_pilot\313.gpkg",
     #'37': r"D:\repositories\roadmap2030\data\aois\final_pilot\37.gpkg",
     #'49': r"D:\repositories\roadmap2030\data\aois\final_pilot\49.gpkg",
-    "costa_rica_pfp": r"D:\repositories\roadmap2030\data\aois\costa_rica_pfp_in_m.gpkg",
-    "costa_rica": r"D:\repositories\roadmap2030\data\aois\costa_rica_in_m.gpkg",
-    "great_bear_pfp": r"D:\repositories\roadmap2030\data\aois\great_bear_pfp_in_m.gpkg",
-    "british_columbia": r"D:\repositories\roadmap2030\data\aois\british_columbia_in_m.gpkg",
+    #"costa_rica_pfp": r"D:\repositories\roadmap2030\data\aois\costa_rica_pfp_in_m.gpkg",
+    #"costa_rica": r"D:\repositories\roadmap2030\data\aois\costa_rica_in_m.gpkg",
+    #"great_bear_pfp": r"D:\repositories\roadmap2030\data\aois\great_bear_pfp_in_m.gpkg",
+    #"british_columbia": r"D:\repositories\roadmap2030\data\aois\british_columbia_in_m.gpkg",
 }
 
 OUTPUT_DIR = "./results"
