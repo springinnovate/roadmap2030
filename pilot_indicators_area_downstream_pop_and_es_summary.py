@@ -1,7 +1,7 @@
 """
 Run with docker container:
 
-docker run --rm -it -v .:/usr/local/esos_c_models -v "D:\repositories\dem_precondition":/usr/local/esos_c_models/dem_precondition therealspring/roadmap2030_executor:latest
+docker run --rm -it -v .:/usr/local/roadmap2030 therealspring/roadmap2030_executor:latest
 """
 
 import collections
@@ -57,10 +57,10 @@ BUFFER_AMOUNTS_IN_PIXELS_M = [
 ]
 
 # This is relative because Docker will map a volume
-GLOBAL_SUBWATERSHEDS_VECTOR_PATH = "./dem_precondition/data/merged_lev06.shp"
-DEM_RASTER_PATH = "./dem_precondition/data/astgtm_compressed.tif"
+GLOBAL_SUBWATERSHEDS_VECTOR_PATH = "./dem_precondition/merged_lev06.shp"
+DEM_RASTER_PATH = "./dem_precondition/astgtm_compressed.tif"
 
-AOI_DIRS = ["./data/WWF-Int_Pilot", "./data/aoi_by_country"]
+AOI_DIRS = ["./data/WWF-Int_Pilot-sites", "./data/aoi_by_country"]
 
 ANALYSIS_AOIS = {}
 BAD_AOIS = {}

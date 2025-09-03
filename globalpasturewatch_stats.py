@@ -31,9 +31,13 @@ logging.getLogger("fiona").setLevel(logging.WARN)
 AOI_PATH, AOI_NAME_KEY = (
     # r"D:\repositories\roadmap2030\data\aois\SOKNOT_landscapes.gpkg",
     # "Sublandsca",
-    r"D:\repositories\data_platform\Conservation_Activities\SOKNOT\SOKNOT_ProjectAreas.gpkg",
+    # r"D:\repositories\data_platform\Conservation_Activities\SOKNOT\SOKNOT_ProjectAreas_fixedgeometries.gpkg",
+    # "Name",
+    r"D:\repositories\data_platform\Conservation_Activities\SOKNOT\SOKNOT_ProjectAreas_insidePCAs.gpkg",
     "Name",
     # r"D:\repositories\data_platform\Conservation_Activities\SOKNOT\SOKNOT_ProjectAreas_outsidePCAs.gpkg",
+    # "Name",
+    # r"D:\repositories\data_platform\Conservation_Activities\SOKNOT\SOKNOT_ProjectAreas_Corridors.gpkg",
     # "Name",
 )
 
@@ -44,7 +48,11 @@ AOI_PATH, AOI_NAME_KEY = (
 # ) + glob.glob(r"Z:/data_platform/Nature/global_pasture_watch_rasters/*.tif")
 # r"Z:\data_platform\Nature\global_pasture_watch_rasters\gpw_gpp.daily.grass_lue.model_m_30m_s_20000101_20000228_go_epsg.4326_v1.tif"
 RASTER_PATHS_TO_SUMMARIZE = glob.glob(
-    r"D:\repositories\data_platform\Nature\eii_soknot/*.tif"
+    # r"D:\repositories\data_platform\Nature\eii_soknot\eii_masked\*.tif"
+    # r"D:\repositories\data_platform\Nature\eii_soknot\pai\*.tif"
+    r"D:\repositories\eii_analysis\workspace_eii_analysis\*.tif"
+    # r"D:\repositories\data_platform\Nature\eii_soknot\fragmentation_index\*.tif"
+    # r"D:\repositories\data_platform\Nature\global_pasture_watch_rasters\rangeland_class\*.tif"
 )
 
 PERCENTILES_LIST = [1, 5, 10, 25, 75, 90, 95, 99]
