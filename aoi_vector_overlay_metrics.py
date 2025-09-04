@@ -5,6 +5,7 @@ pair of AOI x vector data layer the script computes intersections and
 generates statistics (min, max, mean (weighted by area), percentiles
 (weighted by area) the intersected features. The output provides a
 cross-tabulated summary of how data attributes vary across AOIs.
+Use py311 conda environment: mamba activate py311
 """
 
 from datetime import datetime
@@ -35,11 +36,15 @@ logging.getLogger("fiona").setLevel(logging.WARN)
 
 
 AOI_PATHS = [
-    "data/NGP.gpkg",
+    r"D:\repositories\roadmap2030\data\WWF-US_Pilot\aois\small_set\NGP.gpkg",
+    r"D:\repositories\roadmap2030\data\WWF-US_Pilot\aois\small_set\RGRB.gpkg",
 ]
 
-VECTOR_DATA_FIELD_PATHS = [
-    ("data/Scored_Units.gpkg", "Resil_Z"),
+VECTOR_DATA_FIELD_PATHS = [  # this expects a tuple: (path, field)
+    (
+        r"D:\repositories\data_platform\Climate\Resilience\TNC_Freshwater_Resilience_Data_Nov2023\Scored_Units.gpkg",
+        "Resil_Z",
+    ),
 ]
 
 # percentiles are in % units
@@ -65,9 +70,7 @@ def _validate_data():
             errors.append(f'Missing field "{field}" in {path}')
 
     if errors:
-        message = "Validation failed with the following issues:\n" + "\n".join(
-            errors
-        )
+        message = "Validation failed with the following issues:\n" + "\n".join(errors)
         raise RuntimeError(message)
 
 
@@ -135,9 +138,7 @@ def summarize_aoi_vector(
     weighted_percentiles = dict(
         zip(
             [f"wp{int(p)}" for p in PERCENTILES_LIST],
-            _weighted_percentiles(values, areas, PERCENTILES_LIST).astype(
-                float
-            ),
+            _weighted_percentiles(values, areas, PERCENTILES_LIST).astype(float),
         )
     )
 
@@ -147,11 +148,7 @@ def summarize_aoi_vector(
             "min": float(np.min(values)),
             "max": float(np.max(values)),
             "mean": float(np.mean(values)),
-            "std": (
-                float(np.std(values, ddof=1))
-                if values.size > 1
-                else float("nan")
-            ),
+            "std": (float(np.std(values, ddof=1)) if values.size > 1 else float("nan")),
             "area_sum_m2": float(areas.sum()),
             "area_weighted_mean": float(np.average(values, weights=areas)),
             "area_weighted_sum": float(np.sum(values * areas)),
@@ -206,9 +203,7 @@ def load_and_simplify(vector_path):
     LOGGER.debug(f"reading full file at {vector_path}")
     vector = gdf.read_file(vector_path, engine="pyogrio")
     LOGGER.debug(f"simplifying to tolerance {tolerance}")
-    vector["geometry"] = vector.geometry.simplify(
-        tolerance, preserve_topology=False
-    )
+    vector["geometry"] = vector.geometry.simplify(tolerance, preserve_topology=False)
     return vector
 
 
@@ -219,9 +214,7 @@ def main():
     results = []
     for aoi_path in AOI_PATHS:
         for vector_path, vector_field in VECTOR_DATA_FIELD_PATHS:
-            LOGGER.info(
-                f"pre-processing {aoi_path}, {vector_path}, {vector_field}"
-            )
+            LOGGER.info(f"pre-processing {aoi_path}, {vector_path}, {vector_field}")
             LOGGER.debug(f"prepping {aoi_path}")
             aoi_gdf = load_and_simplify(aoi_path)
             LOGGER.debug(f"prepping {vector_path}")

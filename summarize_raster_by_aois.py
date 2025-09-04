@@ -1,5 +1,7 @@
 """6/13/205 (3:51pm) (Friday before vacation) Becky needed this an emergency analysis, it's nearly copied and pasted from `doit.py` except it walks a directory path looking for vectors."""
 
+# mamba activate py39
+
 import collections
 import csv
 import datetime
@@ -34,9 +36,9 @@ logging.getLogger("fiona").setLevel(logging.WARN)
 PERCENTILES_LIST = [1, 5, 10, 25, 50, 75, 90, 95, 99]
 # report the area in the clipped raster that has values >= to these values
 THRESHOLD_AREA_LIST = [
-    0.15,
-    0.3,
-    0.5,
+    # 0.15,
+    # 0.3,
+    # 0.5,
 ]  # [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
 
 BASE_RASTER_LOOKUP = {
@@ -55,7 +57,9 @@ BASE_RASTER_LOOKUP = {
 ANALYSIS_AOIS = {}
 BAD_AOIS = {}  # trash, but you can look if you want
 
-AOI_DIRS = ["./data/WWF-US_Pilot/aois/small_set", "./data/aoi_by_country"]
+AOI_DIRS = [
+    r"D:\repositories\roadmap2030\data\countries",
+]  # "./data/WWF-US_Pilot/aois/small_set", "./data/aoi_by_country"]
 
 for aoi_dir in AOI_DIRS:
     for ext in ["shp", "gpkg"]:
