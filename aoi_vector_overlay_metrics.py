@@ -50,6 +50,12 @@ VECTOR_DATA_FIELD_PATHS = [  # this expects a tuple: (path, field)
 # percentiles are in % units
 PERCENTILES_LIST = [1, 5, 10, 25, 50, 75, 90, 95, 99]
 
+VALUE_THRESHOLDS_FOR_AREA_SUM = [
+    0.15,
+    0.3,
+    0.96,
+]
+
 
 def _validate_data():
     errors = []
@@ -117,6 +123,11 @@ def summarize_aoi_vector(
     values = vec_gdf[vector_field].to_numpy(dtype="float64")
     areas = vec_gdf["__area_m2"].to_numpy(dtype="float64")
 
+    area_threshold_sums = {}
+    for t in VALUE_THRESHOLDS_FOR_AREA_SUM:
+        mask = values >= t
+        area_threshold_sums[f"area_sum_ge_{t}"] = float(areas[mask].sum())
+
     def _weighted_percentiles(x, w, p):
         order = np.argsort(x)
         x_sorted = x[order]
@@ -147,6 +158,7 @@ def summarize_aoi_vector(
             "count": len(vec_gdf),
             "min": float(np.min(values)),
             "max": float(np.max(values)),
+            "sum": float(np.sum(values)),
             "mean": float(np.mean(values)),
             "std": (float(np.std(values, ddof=1)) if values.size > 1 else float("nan")),
             "area_sum_m2": float(areas.sum()),
@@ -155,6 +167,7 @@ def summarize_aoi_vector(
         }
         | unweighted_percentiles  # noqa: W503
         | weighted_percentiles  # noqa: W503
+        | area_threshold_sums  # noqa: W503
     )
     return stats
 
